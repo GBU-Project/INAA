@@ -1,0 +1,7 @@
+#!/bin/bash
+# Launcher untuk INAA.
+# Ganti baris di bawah ini sesuai lokasi folder project INAA kamu.
+INAA_DIR="$HOME/inaa"
+
+cd "$INAA_DIR" || exit 1
+exec python3 main.py "$@"

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=INAA
+Comment=Pemutar media untuk Linux terinspirasi IINA
+Exec=/home/pinux/.local/bin/inaa %f
+Icon=inaa
+Terminal=false
+Categories=AudioVideo;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/x-msvideo;video/quicktime;audio/mpeg;audio/x-wav;
