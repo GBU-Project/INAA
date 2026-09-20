@@ -16,7 +16,10 @@ This module intentionally fails soft: if the D-Bus session bus isn't
 available (e.g. some minimal/headless environments), INAA still runs
 fine without MPRIS — publish() just returns False and logs a note.
 """
+import hashlib
 import os
+
+from media_uri import is_allowed_media_uri, normalize_media_uri
 
 try:
     from pydbus import SessionBus
@@ -208,8 +211,11 @@ class MprisPlayer:
             pass
 
     def OpenUri(self, uri):
-        self._win.add_to_playlist(uri)
-        self._win.open_file(uri)
+        path = normalize_media_uri(uri)
+        if not is_allowed_media_uri(path):
+            return
+        self._win.add_to_playlist(path)
+        self._win.open_file(path)
 
     @property
     def PlaybackStatus(self):
@@ -264,8 +270,8 @@ class MprisPlayer:
             return {"mpris:trackid": GLib.Variant("o", "/org/mpris/MediaPlayer2/inaa/NoTrack")}
 
         title = os.path.basename(path)
-        # Object paths must be alnum/underscore only; hash the path to keep it stable & valid.
-        track_id = f"/org/mpris/MediaPlayer2/inaa/track/{abs(hash(path))}"
+        digest = hashlib.sha256(path.encode("utf-8", errors="replace")).hexdigest()[:16]
+        track_id = f"/org/mpris/MediaPlayer2/inaa/track/{digest}"
 
         metadata = {
             "mpris:trackid": GLib.Variant("o", track_id),

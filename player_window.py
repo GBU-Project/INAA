@@ -19,11 +19,16 @@ on Wayland or GLX on X11, so we don't need to special-case either backend.
 """
 import ctypes
 import ctypes.util
-import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import time
+
+from media_uri import is_allowed_media_uri, normalize_media_uri
+from opensubtitles import download_subtitle, search_subtitles
+from plugin_loader import load_plugins
 
 # Pastikan ~/.local/bin ada di PATH agar mpv selalu menemukan versi yt-dlp terbaru
 _local_bin = str(Path.home() / ".local" / "bin")
@@ -38,7 +43,6 @@ except Exception:
     pass
 import tempfile
 import threading
-import urllib.request
 import urllib.parse
 
 import gi
@@ -221,10 +225,11 @@ def _load_config():
                 data.setdefault("width", 1000)
                 data.setdefault("height", 620)
                 data.setdefault("recent_files", [])
+                data.setdefault("enabled_plugins", [])
                 return data
     except Exception:
         pass
-    return {"volume": 100, "width": 1000, "height": 620, "recent_files": []}
+    return {"volume": 100, "width": 1000, "height": 620, "recent_files": [], "enabled_plugins": []}
 
 
 def _save_config(data):
@@ -341,8 +346,8 @@ class MpvGLArea(Gtk.GLArea):
                 pass
 
         self.player = mpv.MPV(
-            input_default_bindings=True,
-            input_vo_keyboard=True,
+            input_default_bindings=False,
+            input_vo_keyboard=False,
             osc=False,       # we draw our own controls
             vo="libmpv",     # render via the libmpv render API, not a native window
             hwdec="auto-safe",
@@ -449,6 +454,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self._pending_resume_pos = None
         self._drag_start_pos = None
         self._has_played_media = False
+        self._last_config_save = 0.0
 
         # Cache thumbnail seekbar
         self._thumb_cache = {}
@@ -471,7 +477,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self.volume_scale.set_value(saved_vol)
         self.player.volume = saved_vol
 
-        # Muat plugin pengguna
+        # Muat plugin pengguna (IINA-style: Info.json + explicit enable)
         self._load_plugins()
 
         # Integrasi MPRIS (media control sistem: GNOME/KDE now-playing,
@@ -996,7 +1002,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
         })
         # Batasi riwayat maksimal 10 file
         self._config["recent_files"] = recents[:10]
-        _save_config(self._config)
+        self._save_config_throttled(force=True)
         # Update tampilan jika welcome view sedang aktif
         if hasattr(self, "recent_listbox"):
             self._populate_recent_files()
@@ -1014,9 +1020,16 @@ class PlayerWindow(Gtk.ApplicationWindow):
                         item["position"] = round(pos, 1)
                         item["duration"] = round(dur, 1)
                         break
-                _save_config(self._config)
+                self._save_config_throttled()
         except Exception:
             pass
+
+    def _save_config_throttled(self, force=False):
+        now = time.monotonic()
+        if not force and (now - self._last_config_save) < 8.0:
+            return
+        self._last_config_save = now
+        _save_config(self._config)
 
     def _build_inspector_panel(self):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -1377,7 +1390,9 @@ class PlayerWindow(Gtk.ApplicationWindow):
         return self.gl_area.player
 
     def open_file(self, path, resume_pos=None):
-        if not path:
+        path = normalize_media_uri(path)
+        if not is_allowed_media_uri(path):
+            self.show_toast("URI media tidak diizinkan")
             return
         self._current_path = path
 
@@ -1517,6 +1532,9 @@ class PlayerWindow(Gtk.ApplicationWindow):
             pass
 
     def add_to_playlist(self, path):
+        path = normalize_media_uri(path)
+        if not is_allowed_media_uri(path):
+            return
         if path and path not in self.playlist:
             self.playlist.append(path)
             self._refresh_sidebar()
@@ -1911,11 +1929,9 @@ class PlayerWindow(Gtk.ApplicationWindow):
 
             def fetch():
                 try:
-                    url = f"https://rest.opensubtitles.org/search/query-{urllib.parse.quote(query)}"
-                    req = urllib.request.Request(url, headers={"User-Agent": "TemporaryUserAgent"})
-                    with urllib.request.urlopen(req, timeout=5) as resp:
-                        data = json.loads(resp.read().decode())
-                        GLib.idle_add(lambda: render_results(data))
+                    api_key = (self._config.get("opensubtitles_api_key") or "").strip() or None
+                    data = search_subtitles(query, api_key=api_key)
+                    GLib.idle_add(lambda: render_results(data))
                 except Exception as e:
                     GLib.idle_add(lambda: status_lbl.set_text(f"Pencarian gagal: {e}"))
 
@@ -1927,27 +1943,25 @@ class PlayerWindow(Gtk.ApplicationWindow):
                 return
             status_lbl.set_text(f"Ditemukan {len(data)} subtitle:")
             for item in data[:15]:
-                sub_name = item.get("SubFileName") or item.get("MovieName") or "Subtitle"
-                lang = item.get("LanguageName") or item.get("SubLanguageID") or ""
-                sub_url = item.get("SubDownloadLink")
+                sub_name = item.get("name") or "Subtitle"
+                lang = item.get("lang") or ""
+                file_id = item.get("file_id")
                 row = Gtk.ListBoxRow()
                 btn = Gtk.Button(label=f"[{lang}] {sub_name}")
-                btn.connect("clicked", lambda b, u=sub_url, n=sub_name: download_and_load_sub(u, n, dialog))
+                btn.connect("clicked", lambda b, fid=file_id, n=sub_name: download_and_load_sub(fid, n, dialog))
                 row.set_child(btn)
                 results_list.append(row)
 
-        def download_and_load_sub(url, filename, dlg):
+        def download_and_load_sub(file_id, filename, dlg):
+            if not file_id:
+                status_lbl.set_text("ID file subtitle tidak valid.")
+                return
             status_lbl.set_text(f"Mengunduh {filename}...")
             def dl():
                 try:
-                    req = urllib.request.Request(url, headers={"User-Agent": "TemporaryUserAgent"})
-                    with urllib.request.urlopen(req, timeout=8) as resp:
-                        sub_bytes = resp.read()
-                        # Simpan ke temp file
-                        out_path = os.path.join(tempfile.gettempdir(), filename)
-                        with open(out_path, "wb") as f:
-                            f.write(sub_bytes)
-                        GLib.idle_add(lambda: apply_sub(out_path, dlg))
+                    api_key = (self._config.get("opensubtitles_api_key") or "").strip() or None
+                    out_path = download_subtitle(file_id, filename, api_key=api_key)
+                    GLib.idle_add(lambda: apply_sub(out_path, dlg))
                 except Exception as e:
                     GLib.idle_add(lambda: status_lbl.set_text(f"Gagal unduh: {e}"))
             threading.Thread(target=dl, daemon=True).start()
@@ -2001,18 +2015,8 @@ class PlayerWindow(Gtk.ApplicationWindow):
     # ---------------------------------------------------- plugin system
 
     def _load_plugins(self):
-        try:
-            PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
-            for file_path in PLUGINS_DIR.glob("*.py"):
-                spec = importlib.util.spec_from_file_location(file_path.stem, str(file_path))
-                if spec and spec.loader:
-                    mod = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(mod)
-                    if hasattr(mod, "on_load"):
-                        mod.on_load(self)
-                    self._plugins.append(mod)
-        except Exception:
-            pass
+        enabled = self._config.get("enabled_plugins") or []
+        self._plugins = load_plugins(self, PLUGINS_DIR, enabled)
 
     def _trigger_plugin_hook(self, hook_name, *args, **kwargs):
         for plugin in self._plugins:
@@ -2062,8 +2066,11 @@ class PlayerWindow(Gtk.ApplicationWindow):
         if response == Gtk.ResponseType.OK:
             url = entry.get_text().strip()
             if url:
-                self.add_to_playlist(url)
-                self.open_file(url)
+                if not is_allowed_media_uri(url):
+                    self.show_toast("URL tidak diizinkan (hanya http/https)")
+                else:
+                    self.add_to_playlist(url)
+                    self.open_file(url)
         dialog.destroy()
 
     def on_open_clicked(self, button):
@@ -2106,7 +2113,7 @@ class PlayerWindow(Gtk.ApplicationWindow):
         vol = scale.get_value()
         self.player.volume = vol
         self._config["volume"] = vol
-        _save_config(self._config)
+        self._save_config_throttled()
 
     def on_mute_clicked(self, button):
         try:
@@ -2387,14 +2394,15 @@ class PlayerWindow(Gtk.ApplicationWindow):
         return False
 
     def on_drop(self, drop_target, gfile, x, y):
-        path = gfile.get_path()
-        if path:
-            ext = os.path.splitext(path)[1].lower()
-            if ext in SUBTITLE_EXTENSIONS:
-                self._add_and_select_subtitle(path)
-                return True
-            self.add_to_playlist(path)
-            self.open_file(path)
+        path = gfile.get_path() if gfile else None
+        if not path or not os.path.isfile(path):
+            return False
+        ext = os.path.splitext(path)[1].lower()
+        if ext in SUBTITLE_EXTENSIONS:
+            self._add_and_select_subtitle(path)
+            return True
+        self.add_to_playlist(path)
+        self.open_file(path)
         return True
 
     def _connect_signals(self):
@@ -2528,6 +2536,10 @@ class PlayerWindow(Gtk.ApplicationWindow):
             self._config["width"] = self.get_width()
             self._config["height"] = self.get_height()
             _save_config(self._config)
+        try:
+            shutil.rmtree(self._thumb_temp_dir, ignore_errors=True)
+        except Exception:
+            pass
         self.mpris.unpublish()
         self.gl_area.shutdown_player()
         return False

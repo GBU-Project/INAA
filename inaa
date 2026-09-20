@@ -1,7 +1,31 @@
-#!/bin/bash
-# Launcher untuk INAA.
-# Ganti baris di bawah ini sesuai lokasi folder project INAA kamu.
-INAA_DIR="$HOME/inaa"
+#!/usr/bin/env bash
+set -euo pipefail
 
-cd "$INAA_DIR" || exit 1
+if command -v readlink >/dev/null 2>&1; then
+  SELF="$(readlink -f "$0")"
+else
+  SELF="$0"
+fi
+ROOT="$(dirname "$SELF")"
+
+if [ ! -f "$ROOT/main.py" ]; then
+  for candidate in \
+    "${INAA_DIR:-}" \
+    "$HOME/.local/share/inaa" \
+    "$HOME/src/inaa" \
+    "$HOME/INAA" \
+    "$HOME/inaa"; do
+    if [ -n "$candidate" ] && [ -f "$candidate/main.py" ]; then
+      ROOT="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ ! -f "$ROOT/main.py" ]; then
+  echo "INAA: cannot find main.py. Set INAA_DIR to the project folder." >&2
+  exit 1
+fi
+
+cd "$ROOT"
 exec python3 main.py "$@"

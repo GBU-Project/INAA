@@ -2,8 +2,9 @@
 Type=Application
 Name=INAA
 Comment=Pemutar media untuk Linux terinspirasi IINA
-Exec=/home/pinux/.local/bin/inaa %f
-Icon=inaa
+Exec=inaa %F
+Icon=io.github.inaa
 Terminal=false
-Categories=AudioVideo;Player;
-MimeType=video/mp4;video/x-matroska;video/webm;video/x-msvideo;video/quicktime;audio/mpeg;audio/x-wav;
+Categories=AudioVideo;Player;Audio;Video;
+MimeType=video/mp4;video/x-matroska;video/webm;video/x-msvideo;video/quicktime;video/x-flv;video/mpeg;audio/mpeg;audio/x-wav;audio/flac;audio/ogg;audio/mp4;application/ogg;
+StartupWMClass=io.github.inaa

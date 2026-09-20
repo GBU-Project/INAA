@@ -41,8 +41,8 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
   Fitur pengulangan cuplikan bagian tertentu (Titik A ⟲ Titik B) dan kecepatan playback 0.25x hingga 4.0x.
 - **Visual Thumbnail Seekbar**:
   Hover timestamp dan thumbnail preview visual instan saat mengarahkan kursor di sepanjang seek bar.
-- **Sistem Plugin Ekstensi**:
-  Dukungan script Python kustom yang diletakkan di `~/.config/inaa/plugins/`.
+- **Sistem Plugin Ekstensi (ala IINA)**:
+  Plugin berupa folder dengan `Info.json` + entry Python di `~/.config/inaa/plugins/`. Tidak dijalankan otomatis — harus diaktifkan lewat `enabled_plugins` di `config.json`. Plugin hanya menerima API terbatas (toast, path, play/pause, seek), bukan objek window penuh.
 
 ---
 
@@ -113,11 +113,11 @@ python3 main.py /path/ke/video.mp4  # Langsung memutar berkas video/musik
 ### Menyiapkan Launcher Sistem (`inaa` & Desktop Icon)
 Agar INAA dapat dipanggil dari mana saja cukup dengan mengetik `inaa` di terminal atau lewat menu aplikasi sistem:
 
-1. **Pastikan script launcher berada di PATH**:
+1. **Pasang launcher ke PATH** (symlink agar skrip menemukan `main.py`):
    ```bash
    chmod +x inaa
    mkdir -p ~/.local/bin
-   cp inaa ~/.local/bin/inaa
+   ln -sf "$(pwd)/inaa" ~/.local/bin/inaa
    ```
 
 2. **Pasang Desktop Entry & Icon**:
@@ -139,9 +139,13 @@ INAA/
 ├── main.py            # Entry point GtkApplication (GTK4) & asosiasi berkas
 ├── player_window.py   # Window utama: OSD, GLArea, Inspector, playlist, shortcut
 ├── mpris.py           # Integrasi MPRIS2 Linux (D-Bus session bus)
+├── media_uri.py       # Validasi URI file/http/https
+├── plugin_loader.py   # Loader plugin Info.json (opt-in, API terbatas)
+├── opensubtitles.py   # Pencarian/unduh subtitle dengan host & size limit
 ├── inaa               # Bash launcher script untuk ~/.local/bin
 ├── inaa.desktop       # Desktop entry untuk application launcher & menu context
 ├── inaa.png           # Ikon aplikasi INAA
+├── LICENSE            # MIT
 ├── requirements.txt   # Dependensi pustaka Python (python-mpv, PyGObject, pydbus)
 └── README.md          # Dokumentasi teknis & panduan pengguna
 ```
@@ -151,6 +155,16 @@ INAA/
 ## Konfigurasi & Penyimpanan
 
 Pengaturan pengguna tersimpan otomatis di:
-- **Konfigurasi & Riwayat**: `~/.config/inaa/config.json` (volume, ukuran jendela, daftar putar terakhir, posisi timestamp tontonan).
-- **Direktori Plugin**: `~/.config/inaa/plugins/` (tempat meletakkan skrip ekstensi Python kustom).
+- **Konfigurasi & Riwayat**: `~/.config/inaa/config.json` (volume, ukuran jendela, daftar putar terakhir, posisi timestamp tontonan, `enabled_plugins`).
+- **Direktori Plugin**: `~/.config/inaa/plugins/<id>/` berisi `Info.json` dan berkas entry. Contoh:
+
+```json
+{
+  "enabled_plugins": ["io.github.inaa.example-toast"],
+  "opensubtitles_api_key": ""
+}
+```
+
 - **Tangkapan Layar**: `~/Pictures/INAA/` (cuplikan frame PNG beresolusi penuh).
+
+URI yang diterima pemutar hanya berkas lokal, `file://`, `http://`, dan `https://`. MPRIS `OpenUri` memakai batasan yang sama.

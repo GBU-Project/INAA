@@ -34,8 +34,17 @@ class InaaApplication(Gtk.Application):
 
     def do_open(self, files, n_files, hint):
         self.do_activate()
-        if n_files > 0:
-            self.window.open_file(files[0].get_path())
+        paths = []
+        for gfile in files:
+            if not gfile:
+                continue
+            path = gfile.get_path() or gfile.get_uri()
+            if path:
+                paths.append(path)
+        for path in paths:
+            self.window.add_to_playlist(path)
+        if paths:
+            self.window.open_file(paths[0])
 
 
 def main():

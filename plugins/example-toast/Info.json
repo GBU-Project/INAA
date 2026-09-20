@@ -1,0 +1,8 @@
+{
+  "name": "Example Toast",
+  "identifier": "io.github.inaa.example-toast",
+  "version": "0.1.0",
+  "description": "Sample INAA plugin. Enable via config.json enabled_plugins.",
+  "entry": "main.py",
+  "permissions": ["show-osd"]
+}
