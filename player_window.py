@@ -617,6 +617,13 @@ class PlayerWindow(Gtk.ApplicationWindow):
         video_drag_gesture.connect("drag-end", self._on_video_drag_end)
         self.gl_area.add_controller(video_drag_gesture)
 
+        # Trackpad / Mouse Scroll Gesture (IINA-style: Vertical = Volume, Horizontal = Seeking)
+        scroll_controller = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL | Gtk.EventControllerScrollFlags.HORIZONTAL
+        )
+        scroll_controller.connect("scroll", self._on_video_scroll)
+        self.gl_area.add_controller(scroll_controller)
+
         # Video context menu popover
         self.video_context_popover = Gtk.Popover()
         self.video_context_popover.set_parent(self.gl_area)
@@ -1075,6 +1082,20 @@ class PlayerWindow(Gtk.ApplicationWindow):
         box.set_margin_top(6)
         box.set_margin_bottom(12)
 
+        # Hardware Decoding (hwdec)
+        lbl_hw = Gtk.Label(label="Hardware Acceleration:")
+        lbl_hw.set_xalign(0)
+        lbl_hw.add_css_class("iina-sec-title")
+        box.append(lbl_hw)
+
+        hw_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        for hw_val, hw_txt in [("auto-safe", "Auto"), ("vaapi", "VA-API"), ("nvdec", "NVDEC"), ("no", "Off")]:
+            btn = Gtk.Button(label=hw_txt)
+            btn.add_css_class("iina-seg-btn")
+            btn.connect("clicked", lambda b, v=hw_val: self._set_hwdec(v))
+            hw_box.append(btn)
+        box.append(hw_box)
+
         # Aspect Ratio
         lbl_ar = Gtk.Label(label="Aspect Ratio:")
         lbl_ar.set_xalign(0)
@@ -1088,6 +1109,20 @@ class PlayerWindow(Gtk.ApplicationWindow):
             btn.connect("clicked", lambda b, v=ar_val: self._set_aspect_ratio(v))
             ar_box.append(btn)
         box.append(ar_box)
+
+        # Video Crop / Black Bar Removal (ala IINA)
+        lbl_crop = Gtk.Label(label="Video Crop (Black Bars):")
+        lbl_crop.set_xalign(0)
+        lbl_crop.add_css_class("iina-sec-title")
+        box.append(lbl_crop)
+
+        crop_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        for c_val, c_txt in [("none", "None"), ("16:9", "16:9"), ("4:3", "4:3"), ("2.35:1", "2.35"), ("21:9", "21:9")]:
+            btn = Gtk.Button(label=c_txt)
+            btn.add_css_class("iina-seg-btn")
+            btn.connect("clicked", lambda b, v=c_val: self._set_crop(v))
+            crop_box.append(btn)
+        box.append(crop_box)
 
         # Rotation
         lbl_rot = Gtk.Label(label="Rotation:")
@@ -1210,6 +1245,12 @@ class PlayerWindow(Gtk.ApplicationWindow):
         btn_voc.connect("clicked", lambda *_: self._set_audio_filter("vocal"))
         eq_row.append(btn_voc)
 
+        btn_night = Gtk.Button(label="Night Mode")
+        btn_night.add_css_class("iina-seg-btn")
+        btn_night.set_tooltip_text("Normalisasi volume dialog dan suara ledakan (Dynamic Range Compression)")
+        btn_night.connect("clicked", lambda *_: self._set_audio_filter("nightmode"))
+        eq_row.append(btn_night)
+
         btn_rst = Gtk.Button(label="Reset")
         btn_rst.add_css_class("iina-seg-btn")
         btn_rst.connect("clicked", lambda *_: self._set_audio_filter("reset"))
@@ -1225,13 +1266,23 @@ class PlayerWindow(Gtk.ApplicationWindow):
         box.set_margin_top(6)
         box.set_margin_bottom(12)
 
-        lbl_track = Gtk.Label(label="Subtitle Track:")
+        lbl_track = Gtk.Label(label="Primary Subtitle (Bawah):")
         lbl_track.set_xalign(0)
         lbl_track.add_css_class("iina-sec-title")
         box.append(lbl_track)
 
         self.insp_sub_track_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.append(self.insp_sub_track_box)
+
+        # Secondary Subtitle (Dual Subtitle feature ala IINA)
+        lbl_sec_track = Gtk.Label(label="Secondary Subtitle (Atas):")
+        lbl_sec_track.set_xalign(0)
+        lbl_sec_track.add_css_class("iina-sec-title")
+        lbl_sec_track.set_margin_top(8)
+        box.append(lbl_sec_track)
+
+        self.insp_sec_sub_track_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.append(self.insp_sec_sub_track_box)
 
         # External Subtitle Buttons
         lbl_ext = Gtk.Label(label="External Subtitles:")
@@ -1316,6 +1367,36 @@ class PlayerWindow(Gtk.ApplicationWindow):
         pos_row.append(self.insp_sub_pos)
         box.append(pos_row)
 
+        # Subtitle Color & Styling (ala IINA)
+        lbl_style = Gtk.Label(label="Subtitle Style & Color:")
+        lbl_style.set_xalign(0)
+        lbl_style.add_css_class("iina-sec-title")
+        box.append(lbl_style)
+
+        color_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        for col_name, col_code in [("Putih", "#FFFFFF"), ("Kuning", "#FFFF00"), ("Cyan", "#00FFFF"), ("Hijau", "#00FF00")]:
+            btn = Gtk.Button(label=col_name)
+            btn.add_css_class("iina-seg-btn")
+            btn.connect("clicked", lambda b, c=col_code, n=col_name: self._set_sub_color(c, n))
+            color_row.append(btn)
+        box.append(color_row)
+
+        # Background Box Toggle (High Contrast untuk teks)
+        self.sub_box_chk = Gtk.CheckButton(label="Tampilkan Kotak Latar Belakang (High Contrast)")
+        self.sub_box_chk.set_margin_top(4)
+        def on_sub_box_toggled(chk):
+            try:
+                if chk.get_active():
+                    self.player.sub_back_color = "#80000000"  # Semi-transparent black box
+                    self.show_toast("Subtitle Background Box: Aktif")
+                else:
+                    self.player.sub_back_color = "#00000000"  # Transparent
+                    self.show_toast("Subtitle Background Box: Nonaktif")
+            except Exception:
+                pass
+        self.sub_box_chk.connect("toggled", on_sub_box_toggled)
+        box.append(self.sub_box_chk)
+
         return box
 
     def on_inspector_toggled(self, button):
@@ -1324,9 +1405,45 @@ class PlayerWindow(Gtk.ApplicationWindow):
         if visible:
             self._refresh_inspector_tracks()
 
+    def _set_hwdec(self, mode):
+        try:
+            self.player.hwdec = mode
+            mode_lbl = "Auto" if mode == "auto-safe" else mode.upper() if mode != "no" else "Nonaktif"
+            self.show_toast(f"⚡ Hardware Acceleration: {mode_lbl}")
+        except Exception:
+            pass
+
+    def _set_sub_color(self, color_code, name):
+        try:
+            self.player.sub_color = color_code
+            self.show_toast(f"Subtitle Color: {name}")
+        except Exception:
+            pass
+
     def _set_aspect_ratio(self, val):
         try:
             self.player.video_aspect_override = val
+        except Exception:
+            pass
+
+    def _set_crop(self, crop_ratio):
+        try:
+            if crop_ratio in ("none", "no", None):
+                # Hapus filter crop
+                current_vf = getattr(self.player, "vf", "") or ""
+                # Filter out lavfi crop
+                self.player["vf"] = ""
+                self.show_toast("Video Crop: Dinonaktifkan")
+            else:
+                # Terapkan filter crop aspect ratio
+                # 16:9 -> 16/9, 21:9 -> 21/9, dll
+                parts = crop_ratio.split(":")
+                if len(parts) == 2:
+                    w_r, h_r = float(parts[0]), float(parts[1])
+                    ratio_val = w_r / h_r
+                    # Gunakan crop filter FFmpeg: memotong bagian luar agar rasio pas
+                    self.player["vf"] = f"crop=w='min(iw,ih*{ratio_val})':h='min(ih,iw/{ratio_val})'"
+                    self.show_toast(f"✂ Video Crop: {crop_ratio}")
         except Exception:
             pass
 
@@ -1357,11 +1474,10 @@ class PlayerWindow(Gtk.ApplicationWindow):
             btn.connect("clicked", lambda b, track_id=tid: self._set_track("aid", track_id))
             self.insp_audio_track_box.append(btn)
 
-        # Subtitle tracks
+        # Primary Subtitle tracks
         while child := self.insp_sub_track_box.get_first_child():
             self.insp_sub_track_box.remove(child)
 
-        # Option None
         current_sid = getattr(self.player, "sid", None)
         none_btn = Gtk.Button(label=f"{'✓ ' if current_sid in ('no', False, None) else '   '}<None>")
         none_btn.add_css_class("iina-seg-btn")
@@ -1377,6 +1493,30 @@ class PlayerWindow(Gtk.ApplicationWindow):
             btn.add_css_class("iina-seg-btn")
             btn.connect("clicked", lambda b, track_id=tid: self._set_track("sid", track_id))
             self.insp_sub_track_box.append(btn)
+
+        # Secondary Subtitle tracks (Dual Subtitle)
+        if hasattr(self, "insp_sec_sub_track_box"):
+            while child := self.insp_sec_sub_track_box.get_first_child():
+                self.insp_sec_sub_track_box.remove(child)
+
+            try:
+                current_sec_sid = getattr(self.player, "secondary_sid", "no")
+            except Exception:
+                current_sec_sid = "no"
+
+            sec_none_btn = Gtk.Button(label=f"{'✓ ' if current_sec_sid in ('no', False, None) else '   '}<None>")
+            sec_none_btn.add_css_class("iina-seg-btn")
+            sec_none_btn.connect("clicked", lambda *_: self._set_track("secondary_sid", "no"))
+            self.insp_sec_sub_track_box.append(sec_none_btn)
+
+            for t in sub_tracks:
+                tid = t.get("id")
+                name = t.get("title") or t.get("lang") or f"Sub #{tid}"
+                is_sel = (current_sec_sid == tid)
+                btn = Gtk.Button(label=f"{'✓ ' if is_sel else '   '}{name}")
+                btn.add_css_class("iina-seg-btn")
+                btn.connect("clicked", lambda b, track_id=tid: self._set_track("secondary_sid", track_id))
+                self.insp_sec_sub_track_box.append(btn)
 
     def _setup_drag_and_drop(self):
         target = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
@@ -1410,6 +1550,8 @@ class PlayerWindow(Gtk.ApplicationWindow):
         self._pending_resume_pos = resume_pos
         if path not in self.playlist:
             self.playlist.append(path)
+            # Smart Auto-Load Folder Media (ala IINA: otomatis mengisi daftar putar jika memutar file lokal)
+            self._auto_populate_folder_playlist(path)
             self._refresh_sidebar()
         self.playlist_index = self.playlist.index(path)
 
@@ -1531,6 +1673,32 @@ class PlayerWindow(Gtk.ApplicationWindow):
         except Exception:
             pass
 
+    def _auto_populate_folder_playlist(self, current_file_path):
+        """Mendeteksi berkas media lain di folder yang sama dan menambahkannya
+        secara berurutan ke playlist (fitur Smart Next Episode ala IINA)."""
+        try:
+            if not current_file_path or current_file_path.startswith(("http://", "https://", "rtmp://", "ytdl://")):
+                return
+            folder = os.path.dirname(current_file_path)
+            if not os.path.isdir(folder):
+                return
+
+            valid_extensions = VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
+            entries = []
+            for item in sorted(os.listdir(folder)):
+                full_p = os.path.join(folder, item)
+                if os.path.isfile(full_p):
+                    ext = os.path.splitext(item)[1].lower()
+                    if ext in valid_extensions:
+                        entries.append(full_p)
+
+            # Tambahkan berkas yang belum ada di playlist dengan urutan rapi
+            for p in entries:
+                if p not in self.playlist:
+                    self.playlist.append(p)
+        except Exception:
+            pass
+
     def add_to_playlist(self, path):
         path = normalize_media_uri(path)
         if not is_allowed_media_uri(path):
@@ -1620,6 +1788,10 @@ class PlayerWindow(Gtk.ApplicationWindow):
         btn_vocal = Gtk.Button(label="Vocal Boost")
         btn_vocal.connect("clicked", lambda *_: self._set_audio_filter("vocal"))
         eq_box.append(btn_vocal)
+
+        btn_night = Gtk.Button(label="Night Mode")
+        btn_night.connect("clicked", lambda *_: self._set_audio_filter("nightmode"))
+        eq_box.append(btn_night)
         box.append(eq_box)
 
         # Reset button
@@ -1640,10 +1812,16 @@ class PlayerWindow(Gtk.ApplicationWindow):
         try:
             if preset == "bassboost":
                 self.player["af"] = "equalizer=f=64:t=q:w=1:g=8"
+                self.show_toast("🎵 Efek Audio: Bass Boost")
             elif preset == "vocal":
                 self.player["af"] = "equalizer=f=1000:t=q:w=1:g=6"
+                self.show_toast("🎙 Efek Audio: Vocal Boost")
+            elif preset == "nightmode":
+                self.player["af"] = "lavfi=[loudnorm=I=-16:TP=-1.5:LRA=11]"
+                self.show_toast("🌙 Efek Audio: Night Mode (Dynamic Range Normalization)")
             elif preset == "reset":
                 self.player["af"] = ""
+                self.show_toast("Efek Audio Dinonaktifkan")
         except Exception:
             pass
         self.filters_popover.popdown()
@@ -2157,6 +2335,34 @@ class PlayerWindow(Gtk.ApplicationWindow):
         if dist > 120 and not self.is_fullscreen() and not self._is_mini:
             self.detach_video_window()
         self._drag_start_pos = None
+
+    def _on_video_scroll(self, controller, dx, dy):
+        """IINA-style trackpad / mouse gesture:
+        Scroll vertikal: Naik/turunkan volume
+        Scroll horizontal: Seek mundur/maju
+        """
+        # Tangani scroll vertikal (Volume)
+        if abs(dy) >= 0.1:
+            step = -dy * 2.0  # Scroll ke atas dy < 0 -> volume bertambah
+            cur_vol = self.volume_scale.get_value()
+            new_vol = max(0.0, min(100.0, cur_vol + step))
+            self.volume_scale.set_value(new_vol)
+            self.show_toast(f"🔊 Volume: {int(new_vol)}%", duration_ms=1200)
+            return True
+
+        # Tangani scroll horizontal (Seeking)
+        if abs(dx) >= 0.1:
+            seek_delta = dx * 2.0  # Scroll ke kanan dx > 0 -> maju
+            try:
+                self.player.seek(seek_delta, reference="relative")
+                pos = self.player.time_pos or 0
+                dur = self.player.duration or 0
+                self.show_toast(f"⏩ {self._format_time(pos)} / {self._format_time(dur)}", duration_ms=1200)
+            except Exception:
+                pass
+            return True
+
+        return False
 
     def show_toast(self, message, duration_ms=2500):
         if hasattr(self, "toast_label"):

@@ -14,17 +14,23 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
   Panel kontrol melayang berdesain *frosted glass* yang otomatis tersembunyi (*auto-hide*) saat video berjalan dan muncul kembali saat mouse digerakkan.
 - **Sidebar Inspector Pengaturan Lengkap (`i`)**:
   Panel kanan dengan 3 tab:
-  - **Video**: Aspect ratio, rotasi video, deinterlace, filter kecerahan, kontras, saturasi, dan gamma real-time.
-  - **Audio**: Pemilihan trek audio, sinkronisasi delay audio (-5s s/d +5s), serta preset equalizer (Bass Boost, Vocal Boost, Flat).
-  - **Subtitle**: Pemilihan trek subtitle, pemuat subtitle lokal, pencari subtitle online, pengaturan delay, ukuran font (skala), dan posisi vertikal subtitle.
-- **Dukungan Subtitle Komprehensif**:
+  - **Video**: Hardware Acceleration switcher (Auto, VA-API, NVDEC, Off), aspect ratio, **Video Crop / Black Bar Removal** (16:9, 4:3, 2.35:1, 21:9), rotasi video, deinterlace, filter kecerahan, kontras, saturasi, dan gamma real-time.
+  - **Audio**: Pemilihan trek audio, sinkronisasi delay audio (-5s s/d +5s), serta preset equalizer (Bass Boost, Vocal Boost, Night Mode/Dynamic Range Compression, Flat).
+  - **Subtitle**: Dukungan Dual Subtitle (Primary Subtitle bawah & Secondary Subtitle atas ala IINA), pemuat subtitle lokal, pencari subtitle online, pengaturan delay, ukuran font (skala), posisi vertikal, **Pilihan Warna Subtitle** (Putih, Kuning, Cyan, Hijau), dan **Kotak Latar Belakang Kontras Tinggi (Background Box)**.
+- **Dukungan Subtitle Komprehensif & Dual Subtitles**:
+  - **Dual Subtitles (Subtitle Ganda)**: Menampilkan 2 subtitle sekaligus di layar (cocok untuk pembelajaran bahasa).
+  - **Custom Subtitle Styling**: Pengaturan warna teks dan background box semi-transparan untuk keterbacaan maksimal di layar terang.
   - **Auto-load Subtitle Lokal**: Otomatis mendeteksi dan memuat subtitle dari folder yang sama (`sub-auto=fuzzy`).
   - **Pencarian Subtitle Online**: Integrasi pencarian dan pengunduhan subtitle langsung dari OpenSubtitles.
   - **Drag & Drop**: Seret berkas subtitle (.srt, .ass, .vtt) langsung ke jendela video untuk langsung diterapkan.
+- **Gestur Mouse & Trackpad (IINA Gestures)**:
+  - **Scroll Vertikal**: Mengatur volume suara secara halus dengan toast umpan balik visual instan.
+  - **Scroll Horizontal**: Scrubbing dan seeking video maju/mundur dengan akurat.
 - **Resume Playback Otomatis**:
   Mengingat detik posisi tontonan terakhir per file dan langsung melanjutkan pemutaran disertai notifikasi toast status.
-- **Playlist Cerdas & Auto-Advance**:
-  Daftar putar dengan sidebar geser, auto-advance ke trek berikutnya saat lagu/video selesai, dan pemutaran berkelanjutan tanpa henti.
+- **Playlist Cerdas & Smart Next Episode (Auto-Advance)**:
+  - **Smart Folder Discovery**: Saat memutar salah satu file di folder, INAA secara otomatis mendeteksi episode/file media lainnya di direktori yang sama dan menyusunnya rapi ke dalam playlist.
+  - Daftar putar dengan sidebar geser, auto-advance ke trek berikutnya saat lagu/video selesai, dan pemutaran berkelanjutan tanpa henti.
 - **Music Mode (Tampilan Musik Khusus)**:
   Beralih otomatis ke antarmuka musik khusus saat memutar file audio, menampilkan visual cover art, judul lagu, dan artis.
 - **Picture-in-Picture & Mode Mengambang (`d`)**:
@@ -66,6 +72,8 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
 | *Klik Kiri Video* | Putar / Jeda |
 | *Klik Ganda Video* | Layar Penuh (atau restore dari Mini Player) |
 | *Klik Kanan Video* | Menampilkan Context Menu lengkap |
+| *Scroll Vertikal Video* | Naikkan / Turunkan volume suara |
+| *Scroll Horizontal Video* | Scrubbing / Seeking video maju atau mundur |
 | *Seret Mouse Keluar* | Aktifkan Mode Mengambang (Mini Player) |
 
 ---
