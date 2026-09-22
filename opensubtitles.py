@@ -132,7 +132,14 @@ def download_subtitle(file_id, filename, api_key=None):
         raise ValueError("identifikasi subtitle tidak valid")
 
     payload = _maybe_gunzip(payload)
-    out_path = os.path.join(tempfile.gettempdir(), "inaa_" + safe_name)
-    with open(out_path, "wb") as handle:
-        handle.write(payload)
+    suffix = os.path.splitext(safe_name)[1] or ".srt"
+    fd, out_path = tempfile.mkstemp(prefix="inaa_sub_", suffix=suffix)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+            fd = None
+    except Exception:
+        if fd is not None:
+            os.close(fd)
+        raise
     return out_path

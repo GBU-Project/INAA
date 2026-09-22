@@ -138,7 +138,7 @@ class PlaylistMixin:
         """Mendeteksi berkas media lain di folder yang sama dan menambahkannya
         secara berurutan ke playlist (fitur Smart Next Episode ala IINA)."""
         try:
-            if not current_file_path or current_file_path.startswith(("http://", "https://", "rtmp://", "ytdl://")):
+            if not is_local_media_file(current_file_path):
                 return
             folder = os.path.dirname(current_file_path)
             if not os.path.isdir(folder):

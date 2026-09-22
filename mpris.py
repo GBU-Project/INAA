@@ -19,7 +19,7 @@ fine without MPRIS — publish() just returns False and logs a note.
 import hashlib
 import os
 
-from media_uri import is_allowed_media_uri, normalize_media_uri
+from media_uri import is_local_media_file, normalize_media_uri
 
 try:
     from pydbus import SessionBus
@@ -154,7 +154,7 @@ class MprisPlayer:
 
     @property
     def SupportedUriSchemes(self):
-        return ["file", "http", "https"]
+        return ["file"]
 
     @property
     def SupportedMimeTypes(self):
@@ -212,7 +212,7 @@ class MprisPlayer:
 
     def OpenUri(self, uri):
         path = normalize_media_uri(uri)
-        if not is_allowed_media_uri(path):
+        if not is_local_media_file(path):
             return
         self._win.add_to_playlist(path)
         self._win.open_file(path)

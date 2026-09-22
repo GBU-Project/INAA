@@ -48,7 +48,7 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
 - **Visual Thumbnail Seekbar**:
   Hover timestamp dan thumbnail preview visual instan saat mengarahkan kursor di sepanjang seek bar.
 - **Sistem Plugin Ekstensi (ala IINA)**:
-  Plugin berupa folder dengan `Info.json` + entry Python di `~/.config/inaa/plugins/`. Tidak dijalankan otomatis — harus diaktifkan lewat `enabled_plugins` di `config.json`. Plugin hanya menerima API terbatas (toast, path, play/pause, seek), bukan objek window penuh.
+  Plugin berupa folder dengan `Info.json` + entry Python di `~/.config/inaa/plugins/`. Tidak dijalankan otomatis — harus diaktifkan lewat `enabled_plugins` di `config.json`. Plugin dieksekusi di sandbox AST (tanpa `import` / `eval` / `open`) dan hanya menerima API terbatas (toast, path, play/pause, seek).
 
 ---
 
@@ -185,4 +185,4 @@ Pengaturan pengguna tersimpan otomatis di:
 
 - **Tangkapan Layar**: `~/Pictures/INAA/` (cuplikan frame PNG beresolusi penuh).
 
-URI yang diterima pemutar hanya berkas lokal, `file://`, `http://`, dan `https://`. MPRIS `OpenUri` memakai batasan yang sama.
+URI yang diterima pemutar hanya berkas lokal, `file://`, `http://`, dan `https://`. `yt-dlp` hanya diaktifkan saat membuka URL http(s) dari UI. MPRIS `OpenUri` hanya menerima berkas lokal (bukan URL). Konfigurasi disimpan dengan izin `0600`. Subtitle unduhan memakai berkas sementara unik, bukan nama tetap di `/tmp`.

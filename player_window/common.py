@@ -26,14 +26,14 @@ import shutil
 import subprocess
 import time
 
-from media_uri import is_allowed_media_uri, normalize_media_uri
+from media_uri import (
+    is_allowed_media_uri,
+    is_http_media_uri,
+    is_local_media_file,
+    normalize_media_uri,
+)
 from opensubtitles import download_subtitle, search_subtitles
 from plugin_loader import load_plugins
-
-# Pastikan ~/.local/bin ada di PATH agar mpv selalu menemukan versi yt-dlp terbaru
-_local_bin = str(Path.home() / ".local" / "bin")
-if _local_bin not in os.environ.get("PATH", "").split(os.pathsep):
-    os.environ["PATH"] = _local_bin + os.pathsep + os.environ.get("PATH", "")
 
 # mpv internal parser & shader compiler requires LC_NUMERIC="C"
 try:
@@ -240,6 +240,11 @@ def _load_config():
                 data.setdefault("height", 620)
                 data.setdefault("recent_files", [])
                 data.setdefault("enabled_plugins", [])
+                try:
+                    CONFIG_DIR.chmod(0o700)
+                    CONFIG_FILE.chmod(0o600)
+                except OSError:
+                    pass
                 return data
     except Exception:
         pass
@@ -249,8 +254,16 @@ def _load_config():
 def _save_config(data):
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            CONFIG_DIR.chmod(0o700)
+        except OSError:
+            pass
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        try:
+            CONFIG_FILE.chmod(0o600)
+        except OSError:
+            pass
     except Exception:
         pass
 

@@ -162,7 +162,7 @@ class InputMixin:
                 self.thumb_popover.popup()
 
                 # Request thumbnail frame jika bukan URL online dan bukan file audio
-                if self._current_path and not self._current_path.startswith(("http://", "https://")):
+                if is_local_media_file(self._current_path):
                     ext = os.path.splitext(self._current_path)[1].lower()
                     if ext not in AUDIO_EXTENSIONS:
                         self._request_thumbnail(int(hover_time))
@@ -173,7 +173,8 @@ class InputMixin:
         self.thumb_popover.popdown()
 
     def _request_thumbnail(self, sec):
-        if not self._current_path or not os.path.exists(self._current_path):
+        path = self._current_path
+        if not is_local_media_file(path):
             return
         if sec in self._thumb_cache:
             self.thumb_picture.set_filename(self._thumb_cache[sec])
@@ -182,23 +183,33 @@ class InputMixin:
             return
 
         self._thumb_pending.add(sec)
+        media_path = os.path.realpath(path)
+        stamp = int(sec)
 
         def extract():
-            out_file = os.path.join(self._thumb_temp_dir, f"thumb_{sec}.jpg")
+            out_file = os.path.join(self._thumb_temp_dir, f"thumb_{stamp}.jpg")
             try:
-                # Ambil snapshot cepat dengan ffmpeg
                 cmd = [
-                    "ffmpeg", "-ss", str(sec), "-i", self._current_path,
-                    "-vframes", "1", "-s", "160x90", "-f", "image2", "-y", out_file
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-nostdin",
+                    "-protocol_whitelist", "file",
+                    "-ss", str(stamp),
+                    "-i", media_path,
+                    "-vframes", "1",
+                    "-s", "160x90",
+                    "-f", "image2",
+                    "-y", out_file,
                 ]
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
-                if os.path.exists(out_file):
-                    self._thumb_cache[sec] = out_file
-                    GLib.idle_add(lambda: self._on_thumbnail_ready(sec, out_file))
+                if os.path.isfile(out_file):
+                    self._thumb_cache[stamp] = out_file
+                    GLib.idle_add(lambda: self._on_thumbnail_ready(stamp, out_file))
             except Exception:
                 pass
             finally:
-                self._thumb_pending.discard(sec)
+                self._thumb_pending.discard(stamp)
 
         threading.Thread(target=extract, daemon=True).start()
 

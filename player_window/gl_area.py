@@ -26,13 +26,15 @@ class MpvGLArea(Gtk.GLArea):
         self.player = mpv.MPV(
             input_default_bindings=False,
             input_vo_keyboard=False,
-            osc=False,       # we draw our own controls
-            vo="libmpv",     # render via the libmpv render API, not a native window
+            osc=False,
+            vo="libmpv",
             hwdec="auto-safe",
-            sub_auto="fuzzy",           # otomatis memuat subtitle dari folder yang sama
-            audio_file_auto="fuzzy",     # otomatis memuat audio eksternal jika ada
-            ytdl=True,       # enable yt-dlp so URLs (YouTube, etc.) can be played directly
+            sub_auto="exact",
+            audio_file_auto="no",
+            ytdl="no",
             ytdl_format="bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+            config="no",
+            load_scripts="no",
         )
         self.player.volume = 100
         self._render_ctx = None

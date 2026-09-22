@@ -14,6 +14,10 @@ class PlaybackMixin:
         if not is_allowed_media_uri(path):
             self.show_toast("URI media tidak diizinkan")
             return
+        try:
+            self.player["ytdl"] = bool(is_http_media_uri(path))
+        except Exception:
+            pass
         self._current_path = path
 
         # Jika resume_pos tidak diberikan secara eksplisit, cari riwayat posisi terakhir dari config
