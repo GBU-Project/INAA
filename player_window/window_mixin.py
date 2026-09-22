@@ -22,6 +22,8 @@ class WindowMixin:
         if not self._current_path:
             self.show_toast("Tidak ada media yang diputar")
             return
+
+        out_file = None
         try:
             # Simpan ke ~/Pictures/INAA atau ~/Pictures
             pics_dir = Path.home() / "Pictures" / "INAA"
@@ -35,11 +37,16 @@ class WindowMixin:
             # Perintah screenshot video libmpv
             self.player.command("screenshot-to-file", out_file, "video")
             self.show_toast(f"📷 Cuplikan disimpan ke:\nPictures/INAA/{os.path.basename(out_file)}")
-        except Exception as e:
+        except Exception:
             try:
+                if out_file is None:
+                    # Belum sempat menyiapkan nama file (mis. gagal membuat
+                    # folder Pictures/INAA) — tidak ada apa pun untuk
+                    # dijadikan fallback, langsung lempar ke handler luar.
+                    raise
                 # Fallback format biasa
                 self.player.screenshot(out_file)
-                self.show_toast(f"📷 Cuplikan disimpan ke Pictures/INAA")
+                self.show_toast(f"📷 Cuplikan disimpan ke Pictures/INAA/{os.path.basename(out_file)}")
             except Exception as e2:
                 self.show_toast(f"Gagal mengambil cuplikan: {e2}")
 

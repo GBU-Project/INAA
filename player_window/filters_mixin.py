@@ -28,9 +28,11 @@ class FiltersMixin:
     def _set_crop(self, crop_ratio):
         try:
             if crop_ratio in ("none", "no", None):
-                # Hapus filter crop
-                current_vf = getattr(self.player, "vf", "") or ""
-                # Filter out lavfi crop
+                # Hapus filter crop. Catatan: saat ini "vf" hanya pernah diisi
+                # oleh fitur crop ini sendiri, jadi menimpa dengan string
+                # kosong aman. Kalau nanti ada fitur video-filter lain yang
+                # juga menulis ke "vf", baris ini perlu diubah supaya hanya
+                # menghapus komponen crop-nya saja, bukan seluruh chain.
                 self.player["vf"] = ""
                 self.show_toast("Video Crop: Dinonaktifkan")
             else:

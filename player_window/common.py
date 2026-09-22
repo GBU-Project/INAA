@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import time
 
+from keybindings import combo_from_event, invert_shortcuts, merge_shortcuts
 from media_uri import (
     is_allowed_media_uri,
     is_http_media_uri,
@@ -240,6 +241,7 @@ def _load_config():
                 data.setdefault("height", 620)
                 data.setdefault("recent_files", [])
                 data.setdefault("enabled_plugins", [])
+                data.setdefault("shortcuts", {})
                 try:
                     CONFIG_DIR.chmod(0o700)
                     CONFIG_FILE.chmod(0o600)
@@ -248,7 +250,14 @@ def _load_config():
                 return data
     except Exception:
         pass
-    return {"volume": 100, "width": 1000, "height": 620, "recent_files": [], "enabled_plugins": []}
+    return {
+        "volume": 100,
+        "width": 1000,
+        "height": 620,
+        "recent_files": [],
+        "enabled_plugins": [],
+        "shortcuts": {},
+    }
 
 
 def _save_config(data):

@@ -54,63 +54,85 @@ class InputMixin:
 
     def on_key_press(self, controller, keyval, keycode, state):
         name = Gdk.keyval_name(keyval)
+        if not name:
+            return False
+
+        # Escape punya arti kontekstual (keluar mini-player / keluar fullscreen)
+        # yang tidak cocok dimodelkan sebagai satu "action" tetap, jadi tetap
+        # ditangani terpisah dari skema shortcut yang bisa dikonfigurasi.
         if name == "Escape":
             if self._is_mini:
                 self.mini_btn.set_active(False)
                 return True
-            elif self.is_fullscreen():
+            if self.is_fullscreen():
                 self.unfullscreen()
                 return True
-        elif name == "space":
-            self.on_playpause_clicked(None)
-            return True
-        elif name == "i":  # Inspector toggle
-            if not self._is_mini:
-                self.inspector_btn.set_active(not self.inspector_btn.get_active())
-                return True
-        elif name == "Right":
-            self.player.seek(SEEK_STEP_SECONDS, reference="relative")
-            return True
-        elif name == "Left":
-            self.player.seek(-SEEK_STEP_SECONDS, reference="relative")
-            return True
-        elif name == "Up":
-            self.volume_scale.set_value(min(100, self.volume_scale.get_value() + VOLUME_STEP))
-            return True
-        elif name == "Down":
-            self.volume_scale.set_value(max(0, self.volume_scale.get_value() - VOLUME_STEP))
-            return True
-        elif name == "f":
-            self.on_fullscreen_clicked(None)
-            return True
-        elif name == "bracketleft":  # [ kurangi speed
-            self.change_speed(-0.25)
-            return True
-        elif name == "bracketright":  # ] tambah speed
-            self.change_speed(0.25)
-            return True
-        elif name in ("backslash", "BackSpace"):  # reset speed 1.0x
+            return False
+
+        # Alias lama yang tidak masuk skema default (Backspace juga mereset speed).
+        if name == "BackSpace":
             self._set_speed(1.0)
             return True
-        elif name == "l":  # A-B loop toggle
-            self.toggle_ab_loop()
-            return True
-        elif name == "m":  # mute toggle
-            self.on_mute_clicked(None)
-            return True
-        elif name == "s":  # screenshot / capture frame
-            self.take_screenshot()
-            return True
-        elif name == "d":  # detach / separate video window
-            self.detach_video_window()
-            return True
-        elif name == "Page_Up":  # previous chapter
-            self.navigate_chapter(-1)
-            return True
-        elif name == "Page_Down":  # next chapter
-            self.navigate_chapter(1)
-            return True
-        return False
+
+        ctrl = bool(state & Gdk.ModifierType.CONTROL_MASK)
+        alt = bool(state & Gdk.ModifierType.ALT_MASK)
+        shift = bool(state & Gdk.ModifierType.SHIFT_MASK)
+        combo = combo_from_event(name, ctrl=ctrl, alt=alt, shift=shift)
+        if not combo:
+            return False
+
+        shortcuts = merge_shortcuts(self._config.get("shortcuts"))
+        action = invert_shortcuts(shortcuts).get(combo)
+        if not action:
+            return False
+
+        handler = self._shortcut_actions().get(action)
+        if not handler:
+            # Action dikenal (mis. "history"/"edit_shortcuts") tapi belum ada
+            # UI/handler untuk itu. Sengaja dibiarkan tidak melakukan apa-apa
+            # daripada berpura-pura menangani sesuatu yang belum ada.
+            return False
+        handler()
+        return True
+
+    def _shortcut_actions(self):
+        """Peta nama action (lihat keybindings.DEFAULT_SHORTCUTS) ke handler.
+
+        Dibangun ulang tiap panggilan (murah) supaya selalu memakai method
+        yang sudah ter-bind ke instance saat ini, tanpa perlu disimpan di
+        __init__.
+        """
+        return {
+            "play_pause": lambda: self.on_playpause_clicked(None),
+            "seek_forward": lambda: self.player.seek(SEEK_STEP_SECONDS, reference="relative"),
+            "seek_backward": lambda: self.player.seek(-SEEK_STEP_SECONDS, reference="relative"),
+            "volume_up": lambda: self.volume_scale.set_value(
+                min(100, self.volume_scale.get_value() + VOLUME_STEP)
+            ),
+            "volume_down": lambda: self.volume_scale.set_value(
+                max(0, self.volume_scale.get_value() - VOLUME_STEP)
+            ),
+            "fullscreen": lambda: self.on_fullscreen_clicked(None),
+            "inspector": self._toggle_inspector_shortcut,
+            "mute": lambda: self.on_mute_clicked(None),
+            "screenshot": self.take_screenshot,
+            "mini_player": self.detach_video_window,
+            "speed_down": lambda: self.change_speed(-0.25),
+            "speed_up": lambda: self.change_speed(0.25),
+            "speed_reset": lambda: self._set_speed(1.0),
+            "ab_loop": self.toggle_ab_loop,
+            "chapter_prev": lambda: self.navigate_chapter(-1),
+            "chapter_next": lambda: self.navigate_chapter(1),
+            "open_file": lambda: self.on_open_clicked(None),
+            "open_url": lambda: self.on_open_url_clicked(None),
+            # "history" dan "edit_shortcuts" sengaja tidak dipetakan: belum
+            # ada popover riwayat / dialog pengaturan shortcut di UI. Begitu
+            # itu dibuat, tinggal tambahkan entrinya di sini.
+        }
+
+    def _toggle_inspector_shortcut(self):
+        if not self._is_mini:
+            self.inspector_btn.set_active(not self.inspector_btn.get_active())
 
     def on_drop(self, drop_target, gfile, x, y):
         path = gfile.get_path() if gfile else None
