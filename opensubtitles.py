@@ -14,7 +14,7 @@ ALLOWED_SUB_HOSTS = {
     "www.opensubtitles.com",
     "www.opensubtitles.org",
 }
-USER_AGENT = "INAA v1.0"
+USER_AGENT = "INAA Media Player v1.0"
 SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -67,39 +67,32 @@ def search_subtitles(query, api_key=None):
     query = (query or "").strip()
     if not query:
         return []
-    if api_key:
-        url = "https://api.opensubtitles.com/api/v1/subtitles?" + urllib.parse.urlencode(
-            {"query": query, "languages": "en,id"}
+    if not api_key:
+        raise ValueError(
+            "OpenSubtitles API Key diperlukan.\n"
+            "Endpoint lama sudah ditutup. Buat API Key gratis di opensubtitles.com "
+            "dan simpan ke config.json (kunci: 'opensubtitles_api_key')."
         )
-        headers = {
-            "User-Agent": USER_AGENT,
-            "Api-Key": api_key,
-            "Accept": "application/json",
-        }
-        raw, _ = _http_get(url, headers, timeout=8)
-        data = json.loads(raw.decode("utf-8", errors="replace"))
-        results = []
-        for item in (data.get("data") or [])[:15]:
-            attrs = item.get("attributes") or {}
-            files = attrs.get("files") or [{}]
-            file_info = files[0] if files else {}
-            results.append({
-                "name": file_info.get("file_name") or attrs.get("release") or "Subtitle",
-                "lang": attrs.get("language") or "",
-                "file_id": file_info.get("file_id"),
-            })
-        return results
 
-    url = "https://rest.opensubtitles.org/search/query-" + urllib.parse.quote(query)
-    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    url = "https://api.opensubtitles.com/api/v1/subtitles?" + urllib.parse.urlencode(
+        {"query": query, "languages": "en,id"}
+    )
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Api-Key": api_key,
+        "Accept": "application/json",
+    }
     raw, _ = _http_get(url, headers, timeout=8)
     data = json.loads(raw.decode("utf-8", errors="replace"))
     results = []
-    for item in (data or [])[:15]:
+    for item in (data.get("data") or [])[:15]:
+        attrs = item.get("attributes") or {}
+        files = attrs.get("files") or [{}]
+        file_info = files[0] if files else {}
         results.append({
-            "name": item.get("SubFileName") or item.get("MovieName") or "Subtitle",
-            "lang": item.get("LanguageName") or item.get("SubLanguageID") or "",
-            "file_id": item.get("IDSubtitleFile") or item.get("SubDownloadLink"),
+            "name": file_info.get("file_name") or attrs.get("release") or "Subtitle",
+            "lang": attrs.get("language") or "",
+            "file_id": file_info.get("file_id"),
         })
     return results
 

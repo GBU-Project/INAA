@@ -191,6 +191,7 @@ class SubtitlesMixin:
 
         status_lbl = Gtk.Label(label="Ketik judul dan tekan Cari")
         status_lbl.set_xalign(0)
+        status_lbl.set_wrap(True)
         box.append(status_lbl)
 
         results_list = Gtk.ListBox()
@@ -217,7 +218,8 @@ class SubtitlesMixin:
                     data = search_subtitles(query, api_key=api_key)
                     GLib.idle_add(lambda: render_results(data))
                 except Exception as e:
-                    GLib.idle_add(lambda err=e: status_lbl.set_text(f"Pencarian gagal: {err}"))
+                    msg = str(e)
+                    GLib.idle_add(lambda m=msg: status_lbl.set_text(m))
 
             threading.Thread(target=fetch, daemon=True).start()
 
