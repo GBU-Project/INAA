@@ -145,7 +145,17 @@ Sekarang Anda dapat membuka INAA langsung dari Application Menu desktop atau mem
 ```
 INAA/
 ├── main.py            # Entry point GtkApplication (GTK4) & asosiasi berkas
-├── player_window.py   # Window utama: OSD, GLArea, Inspector, playlist, shortcut
+├── player_window/     # Modul modular window utama (GLArea, OSD, mixins)
+│   ├── __init__.py    # Class PlayerWindow (komposisi mixin)
+│   ├── gl_area.py     # OpenGL rendering context & libmpv integration
+│   ├── ui_builder.py  # Konstruksi widget UI, OSD overlay, dan menu
+│   ├── playback_mixin.py # Kontrol playback, chapter, A-B loop, speed
+│   ├── playlist_mixin.py # Playlist & riwayat berkas terakhir
+│   ├── subtitles_mixin.py # Trek subtitle & integrasi OpenSubtitles
+│   ├── filters_mixin.py  # Video equalizer, crop, & audio filter
+│   ├── input_mixin.py    # Gesture, scroll seek, & keyboard shortcuts
+│   ├── window_mixin.py   # Mini player, PiP, toast, & screenshot
+│   └── common.py         # Config, shared helper, styling & GL proc loader
 ├── mpris.py           # Integrasi MPRIS2 Linux (D-Bus session bus)
 ├── media_uri.py       # Validasi URI file/http/https
 ├── plugin_loader.py   # Loader plugin Info.json (opt-in, API terbatas)
