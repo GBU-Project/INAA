@@ -163,10 +163,35 @@ INAA/
 ├── inaa               # Bash launcher script untuk ~/.local/bin
 ├── inaa.desktop       # Desktop entry untuk application launcher & menu context
 ├── inaa.png           # Ikon aplikasi INAA
+├── logging_setup.py   # Rotating log file (~/.config/inaa/logs/) + crash handling
+├── keybindings.py     # Skema shortcut default (dipakai oleh input_mixin.py)
+├── tests/             # Unit test (pytest/unittest) untuk media_uri.py & plugin_loader.py
 ├── LICENSE            # MIT
 ├── requirements.txt   # Dependensi pustaka Python (python-mpv, PyGObject, pydbus)
+├── requirements-dev.txt # Dependensi tambahan untuk menjalankan test (pytest)
 └── README.md          # Dokumentasi teknis & panduan pengguna
 ```
+
+---
+
+## Menjalankan Test
+
+Modul yang tidak butuh GTK4/libmpv (`media_uri.py`, validasi URI/path; `plugin_loader.py`,
+sandbox plugin berbasis AST) punya unit test yang bisa dijalankan di mesin mana pun,
+termasuk tanpa GTK4 terpasang:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+`tests/test_media_uri.py` dan `tests/test_plugin_loader.py` berisi test dasar (gaya
+`unittest`). `tests/test_media_uri_security.py` dan `tests/test_plugin_loader_security.py`
+menambah cakupan kasus tepi dari audit keamanan — termasuk regression test untuk teknik
+bypass sandbox yang pernah dicoba (introspeksi frame generator, `str.format()` attribute
+traversal, path traversal pada `entry` di `Info.json`). Kalau salah satu regression test
+itu mulai lolos ("payload not blocked"), itu tandanya sandbox mengalami regresi dan perlu
+segera dicek.
 
 ---
 
