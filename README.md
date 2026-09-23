@@ -166,11 +166,22 @@ INAA/
 ├── logging_setup.py   # Rotating log file (~/.config/inaa/logs/) + crash handling
 ├── keybindings.py     # Skema shortcut default (dipakai oleh input_mixin.py)
 ├── tests/             # Unit test (pytest/unittest) untuk media_uri.py & plugin_loader.py
+├── flatpak/           # Manifest Flatpak (io.github.inaa.json) + panduan build
 ├── LICENSE            # MIT
 ├── requirements.txt   # Dependensi pustaka Python (python-mpv, PyGObject, pydbus)
 ├── requirements-dev.txt # Dependensi tambahan untuk menjalankan test (pytest)
 └── README.md          # Dokumentasi teknis & panduan pengguna
 ```
+
+---
+
+## Instalasi via Flatpak
+
+Selain instalasi manual (lihat "Instalasi Dependensi" di atas), tersedia manifest
+Flatpak di `flatpak/io.github.inaa.json` yang membangun INAA beserta libmpv dari
+source (jadi tidak bergantung pada versi libmpv/ffmpeg yang terpasang di sistem).
+Lihat `flatpak/README.md` untuk cara build, apa yang sudah diverifikasi, dan apa
+yang masih perlu dicek sebelum build produksi/submit ke Flathub.
 
 ---
 

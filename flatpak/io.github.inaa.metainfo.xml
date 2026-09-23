@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Minimal AppStream metainfo: enough for a local flatpak-builder build and
+  for appstream-util validate-relax to pass. NOT yet Flathub-submission
+  ready: a real submission additionally wants at least one screenshot with
+  a real image URL and a fuller release history. See
+  https://docs.flathub.org/docs/for-app-authors/metainfo-guidelines/
+-->
+<component type="desktop-application">
+  <id>io.github.inaa</id>
+  <name>INAA</name>
+  <summary>GTK4/Wayland-native media player inspired by IINA</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.inaa">
+    <name>INAA Project</name>
+  </developer>
+
+  <description>
+    <p>
+      INAA is a GTK4 media player for Linux, built on libmpv and rendered
+      natively through the OpenGL render API (works under Wayland and X11,
+      not just XWayland). It's inspired by IINA's design on macOS.
+    </p>
+    <p xml:lang="id">
+      INAA adalah pemutar media GTK4 untuk Linux, dibangun di atas libmpv dan
+      dirender langsung lewat OpenGL render API (jalan native di Wayland
+      maupun X11, bukan cuma lewat XWayland). Terinspirasi dari desain IINA
+      di macOS.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Native Wayland rendering (no X11/XWayland embedding trick)</li>
+      <li>Dual/overlapping subtitle tracks with per-track styling</li>
+      <li>MPRIS2 media-key and desktop integration</li>
+      <li>Video crop, hardware decoding, A-B loop, chapter navigation</li>
+      <li>Mini-player mode, drag-and-drop playlist, resume playback</li>
+      <li>Optional, sandboxed plugin system (AST-restricted, opt-in)</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.inaa.desktop</launchable>
+  <provides>
+    <binary>inaa</binary>
+  </provides>
+
+  <content_rating type="oars-1.1" />
+
+  <url type="homepage">https://github.com/GBU-Project/INAA</url>
+  <url type="bugtracker">https://github.com/GBU-Project/INAA/issues</url>
+
+  <releases>
+    <release version="0.1.0" date="2026-09-23">
+      <description>
+        <p>First Flatpak packaging pass. See the project README for the full changelog.</p>
+      </description>
+    </release>
+  </releases>
+</component>

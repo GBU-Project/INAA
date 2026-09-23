@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Installed to /app/bin/inaa by flatpak/io.github.inaa.json.
+# Source files are installed to /app/share/inaa/ (see that manifest's
+# "inaa" module build-commands).
+set -euo pipefail
+cd /app/share/inaa
+exec python3 main.py "$@"
