@@ -13,7 +13,7 @@ class PlaylistMixin:
             self.recent_listbox.remove(child)
             child = nxt
 
-        recents = self._config.get("recent_files", [])
+        recents = self._config.get("recent_files", [])[:8]
         if not recents:
             empty_lbl = Gtk.Label(label="Belum ada file yang diputar")
             empty_lbl.add_css_class("dim-label")
@@ -97,14 +97,16 @@ class PlaylistMixin:
         except Exception:
             pass
 
+        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         recents.insert(0, {
             "path": path,
             "title": title,
             "position": round(pos, 1) if pos else 0,
             "duration": round(duration, 1) if duration else 0,
+            "last_played": now_ts,
         })
-        # Batasi riwayat maksimal 10 file
-        self._config["recent_files"] = recents[:10]
+        # Simpan hingga 100 riwayat pemutaran (ala IINA)
+        self._config["recent_files"] = recents[:100]
         self._save_config_throttled(force=True)
         # Update tampilan jika welcome view sedang aktif
         if hasattr(self, "recent_listbox"):
@@ -118,10 +120,12 @@ class PlaylistMixin:
             dur = self.player.duration or 0
             if dur > 0 and pos > 0:
                 recents = self._config.get("recent_files", [])
+                now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 for item in recents:
                     if item.get("path") == self._current_path:
                         item["position"] = round(pos, 1)
                         item["duration"] = round(dur, 1)
+                        item["last_played"] = now_ts
                         break
                 self._save_config_throttled()
         except Exception:

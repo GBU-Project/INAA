@@ -34,7 +34,9 @@ class MpvGLArea(Gtk.GLArea):
             "ytdl": "no",
             "ytdl_format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
             "load_scripts": "no",
-            "config": bool(use_mpv_conf),
+            # mpv TIDAK boleh membaca mpv.conf sendiri: file itu bisa menimpa opsi
+            # keamanan di atas (script, input-ipc-server, ytdl). Lihat mpv_user.py.
+            "config": False,
         }
 
         self.player = mpv.MPV(**mpv_kwargs)

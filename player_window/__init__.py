@@ -127,6 +127,12 @@ class PlayerWindow(
         # Terapkan shader yang tersimpan
         self._apply_saved_shaders()
 
+        # mpv.conf (hanya opsi aman, opt-in) dan script eksplisit
+        self._apply_user_mpv_settings()
+
+        # Terapkan filter equalizer & audio yang tersimpan
+        self._apply_audio_filters()
+
         # Muat plugin pengguna (IINA-style: Info.json + explicit enable)
         self._load_plugins()
 

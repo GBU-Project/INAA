@@ -26,8 +26,16 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
 - **Gestur Mouse & Trackpad (IINA Gestures)**:
   - **Scroll Vertikal**: Mengatur volume suara secara halus dengan toast umpan balik visual instan.
   - **Scroll Horizontal**: Scrubbing dan seeking video maju/mundur dengan akurat.
-- **Resume Playback Otomatis**:
-  Mengingat detik posisi tontonan terakhir per file dan langsung melanjutkan pemutaran disertai notifikasi toast status.
+- **Playback History & Resume Otomatis (`Ctrl+H`)**:
+  - Jendela Riwayat Pemutaran khusus ala IINA dengan kotak pencarian instan (nama file, judul, path).
+  - Menyimpan path file, waktu terakhir diputar, durasi, dan posisi resume (hingga 100 berkas).
+  - Klik pada riwayat untuk langsung melanjutkan pemutaran disertai notifikasi toast status.
+- **Audio Equalizer 10-Band & Filter Audio Aman**:
+  - Equalizer 10 band standar ISO (31Hz hingga 16kHz) dengan rentang gain -12 dB hingga +12 dB di tab Inspector Audio (`i`).
+  - Berbagai preset equalizer instan: *Flat, Bass Boost, Vocal Boost, Rock, Pop, Classic, Electro, Acoustic, Party*.
+  - Efek audio khusus terisolasi: *Night Mode* (Dynamic Range Compression), *Karaoke* (Center Vocal Reducer), dan *Clarity Boost*.
+  - Delay audio dan delay subtitle (-5s s/d +5s) dengan sinkronisasi presisi.
+  - Seluruh parameter filter audio dibangun lewat allowlist divalidasi ketat (`audio_filters.py`), bukan membuka celah opsi `af` mentah dari `mpv.conf`.
 - **Playlist Cerdas & Smart Next Episode (Auto-Advance)**:
   - **Smart Folder Discovery**: Saat memutar salah satu file di folder, INAA secara otomatis mendeteksi episode/file media lainnya di direktori yang sama dan menyusunnya rapi ke dalam playlist.
   - Daftar putar dengan sidebar geser, **ulang semua / ulang satu / acak**, auto-advance ke trek berikutnya, dan pemutaran berkelanjutan.
@@ -49,7 +57,8 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
   Hover timestamp dan thumbnail preview visual instan saat mengarahkan kursor di sepanjang seek bar.
 - **Dukungan mpv.conf & Custom GLSL Shaders (Opt-In)**:
   - **Custom Shaders**: Peningkatan kualitas gambar dengan shader GLSL / mpv hooks (.hook, .glsl seperti Anime4K, FSRCNNX, CAS) yang dapat ditambahkan dan dikelola langsung dari tab Video Inspector.
-  - **mpv.conf Opt-in**: Pilihan untuk memuat konfigurasi `~/.config/mpv/mpv.conf` tanpa merusak prioritas pengaturan UI native INAA.
+  - **mpv.conf Opt-in (aman)**: INAA membaca `~/.config/mpv/mpv.conf` sendiri dan hanya menerapkan opsi tampilan/audio/subtitle/cache dari daftar yang diizinkan (`mpv_user.py`). Opsi seperti `script`, `input-ipc-server`, `ytdl*`, `vo`, `osc`, `include`, `vf/af` diabaikan dan dilaporkan di log. mpv sengaja tidak diizinkan membaca `mpv.conf` sendiri karena file itu bisa menimpa pengaturan keamanan INAA.
+  - **Script mpv (opt-in)**: isi `"mpv_scripts": ["/path/absolut/x.lua"]` di `~/.config/inaa/config.json`. Script Lua/JS berjalan dengan akses penuh ke akunmu; muat hanya yang kamu percaya.
 - **Playlist M3U / M3U8 Lengkap**:
   - Dukungan impor dan ekspor daftar putar format `.m3u` dan Extended M3U (`#EXTM3U`).
   - Toolbar aksi cepat di sidebar (Buka Playlist, Simpan Playlist, Kosongkan) serta dukungan drag-and-drop file playlist langsung ke jendela.

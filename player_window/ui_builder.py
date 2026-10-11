@@ -1,6 +1,7 @@
 """Widget construction: header bar, welcome screen, music view, inspector tabs, drag&drop, signal wiring."""
 from .common import *  # noqa: F401,F403
 from .gl_area import MpvGLArea
+import audio_filters
 
 
 class UIBuilderMixin:
@@ -19,6 +20,11 @@ class UIBuilderMixin:
         open_url_btn.set_tooltip_text("Buka dari URL (YouTube, dll.)")
         open_url_btn.connect("clicked", self.on_open_url_clicked)
         self.header.pack_start(open_url_btn)
+
+        history_btn = Gtk.Button.new_from_icon_name("document-open-recent-symbolic")
+        history_btn.set_tooltip_text("Riwayat Pemutaran (Ctrl+H)")
+        history_btn.connect("clicked", self.open_history_dialog)
+        self.header.pack_start(history_btn)
 
         self.playlist_toggle = Gtk.ToggleButton()
         self.playlist_toggle.set_icon_name("view-list-symbolic")
@@ -667,7 +673,7 @@ class UIBuilderMixin:
         lbl_conf.add_css_class("iina-sec-title")
         box.append(lbl_conf)
 
-        self.mpv_conf_chk = Gtk.CheckButton(label="Gunakan ~/.config/mpv/mpv.conf (Butuh restart)")
+        self.mpv_conf_chk = Gtk.CheckButton(label="Gunakan ~/.config/mpv/mpv.conf (opsi aman saja, butuh restart)")
         self.mpv_conf_chk.set_active(bool(self._config.get("use_mpv_conf", False)))
         def on_mpv_conf_toggled(chk):
             is_act = chk.get_active()
@@ -732,35 +738,120 @@ class UIBuilderMixin:
         del_row.append(self.insp_audio_delay_label)
         box.append(del_row)
 
-        # Audio Equalizer Presets
-        lbl_eq = Gtk.Label(label="Audio Presets:")
+        # 10-Band Equalizer Title & Presets
+        eq_header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        lbl_eq = Gtk.Label(label="Audio Equalizer (10 Band):")
         lbl_eq.set_xalign(0)
+        lbl_eq.set_hexpand(True)
         lbl_eq.add_css_class("iina-sec-title")
-        box.append(lbl_eq)
+        eq_header_box.append(lbl_eq)
 
-        eq_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        btn_bb = Gtk.Button(label="Bass Boost")
-        btn_bb.add_css_class("iina-seg-btn")
-        btn_bb.connect("clicked", lambda *_: self._set_audio_filter("bassboost"))
-        eq_row.append(btn_bb)
+        btn_rst_eq = Gtk.Button(label="Reset EQ")
+        btn_rst_eq.add_css_class("iina-seg-btn")
+        btn_rst_eq.connect("clicked", lambda *_: self._reset_audio_eq())
+        eq_header_box.append(btn_rst_eq)
+        box.append(eq_header_box)
 
-        btn_voc = Gtk.Button(label="Vocal Boost")
-        btn_voc.add_css_class("iina-seg-btn")
-        btn_voc.connect("clicked", lambda *_: self._set_audio_filter("vocal"))
-        eq_row.append(btn_voc)
+        # Equalizer Presets Buttons Row
+        eq_presets_box1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        for p_key, p_lbl in [
+            ("flat", "Flat"),
+            ("bass_boost", "Bass+"),
+            ("vocal_boost", "Vocal+"),
+            ("rock", "Rock"),
+            ("pop", "Pop"),
+        ]:
+            btn_p = Gtk.Button(label=p_lbl)
+            btn_p.add_css_class("iina-seg-btn")
+            btn_p.connect("clicked", lambda _b, k=p_key: self._set_audio_eq_preset(k))
+            eq_presets_box1.append(btn_p)
+        box.append(eq_presets_box1)
 
+        eq_presets_box2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        for p_key, p_lbl in [
+            ("classical", "Classic"),
+            ("electronic", "Electro"),
+            ("acoustic", "Acoustic"),
+            ("party", "Party"),
+        ]:
+            btn_p = Gtk.Button(label=p_lbl)
+            btn_p.add_css_class("iina-seg-btn")
+            btn_p.connect("clicked", lambda _b, k=p_key: self._set_audio_eq_preset(k))
+            eq_presets_box2.append(btn_p)
+        box.append(eq_presets_box2)
+
+        # 10 Vertical Sliders
+        eq_sliders_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        eq_sliders_container.set_halign(Gtk.Align.CENTER)
+        eq_sliders_container.set_margin_top(8)
+        eq_sliders_container.set_margin_bottom(8)
+
+        self._eq_band_scales = []
+        self._eq_band_value_labels = []
+
+        saved_gains = self._config.get("audio_eq_gains", [0.0] * 10)
+        for i, (freq, lbl_hz) in enumerate(zip(audio_filters.EQ_BANDS, audio_filters.EQ_BAND_LABELS)):
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            col.add_css_class("iina-eq-band-box")
+
+            val = saved_gains[i] if i < len(saved_gains) else 0.0
+            lbl_val = Gtk.Label(label=f"{val:+.1f}dB" if val != 0 else "0dB")
+            lbl_val.add_css_class("iina-eq-val-lbl")
+            self._eq_band_value_labels.append(lbl_val)
+            col.append(lbl_val)
+
+            scale = Gtk.Scale.new_with_range(Gtk.Orientation.VERTICAL, -12.0, 12.0, 0.5)
+            scale.set_inverted(True)
+            scale.set_size_request(-1, 100)
+            scale.set_draw_value(False)
+            scale.set_value(val)
+            def on_band_changed(sc, band_idx=i, v_lbl=lbl_val):
+                g = round(sc.get_value(), 1)
+                v_lbl.set_text(f"{g:+.1f}dB" if g != 0 else "0dB")
+                self._set_audio_eq_band(band_idx, g)
+            scale.connect("value-changed", on_band_changed)
+            self._eq_band_scales.append(scale)
+            col.append(scale)
+
+            lbl_freq = Gtk.Label(label=lbl_hz)
+            lbl_freq.add_css_class("iina-eq-hz-lbl")
+            col.append(lbl_freq)
+
+            eq_sliders_container.append(col)
+
+        box.append(eq_sliders_container)
+
+        # Efek Khusus Audio
+        lbl_fx = Gtk.Label(label="Efek Khusus Audio:")
+        lbl_fx.set_xalign(0)
+        lbl_fx.add_css_class("iina-sec-title")
+        box.append(lbl_fx)
+
+        fx_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         btn_night = Gtk.Button(label="Night Mode")
         btn_night.add_css_class("iina-seg-btn")
-        btn_night.set_tooltip_text("Normalisasi volume dialog dan suara ledakan (Dynamic Range Compression)")
-        btn_night.connect("clicked", lambda *_: self._set_audio_filter("nightmode"))
-        eq_row.append(btn_night)
+        btn_night.set_tooltip_text("Dynamic Range Compression (dialog jelas tanpa lonjakan suara keras)")
+        btn_night.connect("clicked", lambda *_: self._set_audio_special_effect("nightmode"))
+        fx_row.append(btn_night)
 
-        btn_rst = Gtk.Button(label="Reset")
-        btn_rst.add_css_class("iina-seg-btn")
-        btn_rst.connect("clicked", lambda *_: self._set_audio_filter("reset"))
-        eq_row.append(btn_rst)
-        box.append(eq_row)
+        btn_karaoke = Gtk.Button(label="Karaoke")
+        btn_karaoke.add_css_class("iina-seg-btn")
+        btn_karaoke.set_tooltip_text("Peredam Vokal Tengah (Stereo Center Cancel)")
+        btn_karaoke.connect("clicked", lambda *_: self._set_audio_special_effect("karaoke"))
+        fx_row.append(btn_karaoke)
 
+        btn_clarity = Gtk.Button(label="Clarity Boost")
+        btn_clarity.add_css_class("iina-seg-btn")
+        btn_clarity.set_tooltip_text("Penajaman treble & vokal")
+        btn_clarity.connect("clicked", lambda *_: self._set_audio_special_effect("clarity"))
+        fx_row.append(btn_clarity)
+
+        btn_nofx = Gtk.Button(label="Mati")
+        btn_nofx.add_css_class("iina-seg-btn")
+        btn_nofx.connect("clicked", lambda *_: self._set_audio_special_effect("none"))
+        fx_row.append(btn_nofx)
+
+        box.append(fx_row)
         return box
 
     def _build_sub_tab(self):

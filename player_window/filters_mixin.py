@@ -1,5 +1,9 @@
 """Video/audio inspector controls: hwdec, aspect/crop/rotate, filter presets."""
 from .common import *  # noqa: F401,F403
+import logging
+
+import audio_filters
+import mpv_user
 
 
 class FiltersMixin:
@@ -53,6 +57,16 @@ class FiltersMixin:
             self.player.video_rotate = val
         except Exception:
             pass
+
+    def _apply_user_mpv_settings(self):
+        """Terapkan mpv.conf (allowlist) dan script eksplisit; opsi ditolak dilaporkan."""
+        cfg = {k: self._config.get(k) for k in ("use_mpv_conf", "mpv_conf", "mpv_scripts")}
+        report = mpv_user.apply_user_settings(self.player, cfg, SHADERS_DIR)
+        self._mpv_user_report = report
+        for source, reason in report.rejected:
+            logging.getLogger("inaa").warning("mpv: diabaikan: %s — %s", source, reason)
+        if report.applied or report.rejected or report.scripts:
+            GLib.timeout_add(1200, lambda: (self.show_toast(report.summary()), False)[1])
 
     def _apply_saved_shaders(self):
         """Menerapkan shader yang tersimpan di config ke libmpv."""
@@ -173,22 +187,37 @@ class FiltersMixin:
         box.append(sep)
 
         # Equalizer audio preset
-        eq_title = Gtk.Label(label="Audio Equalizer / Efek")
+        eq_title = Gtk.Label(label="Audio Equalizer / Efek:")
         eq_title.set_xalign(0)
+        eq_title.add_css_class("heading")
         box.append(eq_title)
 
         eq_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        btn_bass = Gtk.Button(label="Bass Boost")
+        btn_bass = Gtk.Button(label="Bass+")
+        btn_bass.add_css_class("iina-seg-btn")
         btn_bass.connect("clicked", lambda *_: self._set_audio_filter("bassboost"))
         eq_box.append(btn_bass)
 
-        btn_vocal = Gtk.Button(label="Vocal Boost")
+        btn_vocal = Gtk.Button(label="Vocal+")
+        btn_vocal.add_css_class("iina-seg-btn")
         btn_vocal.connect("clicked", lambda *_: self._set_audio_filter("vocal"))
         eq_box.append(btn_vocal)
 
         btn_night = Gtk.Button(label="Night Mode")
+        btn_night.add_css_class("iina-seg-btn")
         btn_night.connect("clicked", lambda *_: self._set_audio_filter("nightmode"))
         eq_box.append(btn_night)
+
+        btn_full_eq = Gtk.Button(label="Equalizer 10 Band...")
+        btn_full_eq.add_css_class("iina-seg-btn")
+        def open_full_eq_tab(_b):
+            self.filters_popover.popdown()
+            self.inspector_panel.set_visible(True)
+            self.inspector_btn.set_active(True)
+            if hasattr(self, "insp_stack"):
+                self.insp_stack.set_visible_child_name("audio")
+        btn_full_eq.connect("clicked", open_full_eq_tab)
+        eq_box.append(btn_full_eq)
         box.append(eq_box)
 
         # Reset button
@@ -205,23 +234,87 @@ class FiltersMixin:
         except Exception:
             pass
 
-    def _set_audio_filter(self, preset):
+    def _apply_audio_filters(self):
+        """Menerapkan filter audio dari konfigurasi equalizer dan efek khusus."""
+        gains = self._config.get("audio_eq_gains", [0.0] * 10)
+        effect = self._config.get("audio_special_effect", "none")
+        af_str = audio_filters.compose_af_string(gains, effect)
         try:
-            if preset == "bassboost":
-                self.player["af"] = "equalizer=f=64:t=q:w=1:g=8"
-                self.show_toast("🎵 Efek Audio: Bass Boost")
-            elif preset == "vocal":
-                self.player["af"] = "equalizer=f=1000:t=q:w=1:g=6"
-                self.show_toast("🎙 Efek Audio: Vocal Boost")
-            elif preset == "nightmode":
-                self.player["af"] = "lavfi=[loudnorm=I=-16:TP=-1.5:LRA=11]"
-                self.show_toast("🌙 Efek Audio: Night Mode (Dynamic Range Normalization)")
-            elif preset == "reset":
-                self.player["af"] = ""
-                self.show_toast("Efek Audio Dinonaktifkan")
-        except Exception:
-            pass
-        self.filters_popover.popdown()
+            self.player["af"] = af_str
+        except Exception as e:
+            logging.getLogger("inaa").warning("Gagal menerapkan filter audio: %s", e)
+
+    def _set_audio_eq_band(self, index, gain):
+        """Mengubah gain band equalizer tertentu (-12 s/d +12 dB)."""
+        gains = list(self._config.get("audio_eq_gains", [0.0] * 10))
+        while len(gains) < 10:
+            gains.append(0.0)
+        gains[index] = audio_filters.clamp_gain(gain)
+        self._config["audio_eq_gains"] = gains
+        self._config["audio_eq_preset"] = "custom"
+        self._apply_audio_filters()
+        self._save_config_throttled()
+
+    def _set_audio_eq_preset(self, preset_name):
+        """Menerapkan preset equalizer 10-band."""
+        if preset_name in audio_filters.EQ_PRESETS:
+            gains = list(audio_filters.EQ_PRESETS[preset_name])
+            self._config["audio_eq_gains"] = gains
+            self._config["audio_eq_preset"] = preset_name
+            self._apply_audio_filters()
+            self._save_config_throttled(force=True)
+            self._sync_eq_sliders_ui()
+            p_label = preset_name.replace("_", " ").title()
+            self.show_toast(f"🎚 Equalizer Preset: {p_label}")
+
+    def _set_audio_special_effect(self, effect_name):
+        """Menerapkan efek audio khusus (nightmode, karaoke, clarity, atau none)."""
+        if effect_name in audio_filters.SPECIAL_AUDIO_EFFECTS:
+            self._config["audio_special_effect"] = effect_name
+            self._apply_audio_filters()
+            self._save_config_throttled(force=True)
+            if effect_name == "nightmode":
+                self.show_toast("🌙 Efek Audio: Night Mode (Dynamic Range Compression)")
+            elif effect_name == "karaoke":
+                self.show_toast("🎤 Efek Audio: Karaoke (Vocal Reducer)")
+            elif effect_name == "clarity":
+                self.show_toast("✨ Efek Audio: Clarity Boost")
+            else:
+                self.show_toast("Efek Khusus Dinonaktifkan")
+
+    def _sync_eq_sliders_ui(self):
+        """Sinkronkan posisi slider EQ di Inspector dengan nilai konfigurasi."""
+        if not hasattr(self, "_eq_band_scales"):
+            return
+        gains = self._config.get("audio_eq_gains", [0.0] * 10)
+        for i, scale in enumerate(self._eq_band_scales):
+            val = gains[i] if i < len(gains) else 0.0
+            scale.set_value(val)
+            if hasattr(self, "_eq_band_value_labels") and i < len(self._eq_band_value_labels):
+                self._eq_band_value_labels[i].set_text(f"{val:+.1f}dB" if val != 0 else "0dB")
+
+    def _set_audio_filter(self, preset):
+        # Backward compatibility handler untuk UI popover / inspector lama
+        if preset == "bassboost":
+            self._set_audio_eq_preset("bass_boost")
+        elif preset == "vocal":
+            self._set_audio_eq_preset("vocal_boost")
+        elif preset == "nightmode":
+            self._set_audio_special_effect("nightmode")
+        elif preset == "reset":
+            self._reset_audio_eq()
+        if hasattr(self, "filters_popover"):
+            self.filters_popover.popdown()
+
+    def _reset_audio_eq(self):
+        """Kembalikan equalizer dan efek audio ke kondisi flat/mati."""
+        self._config["audio_eq_preset"] = "flat"
+        self._config["audio_eq_gains"] = [0.0] * 10
+        self._config["audio_special_effect"] = "none"
+        self._apply_audio_filters()
+        self._save_config_throttled(force=True)
+        self._sync_eq_sliders_ui()
+        self.show_toast("Equalizer & Efek Audio Direset")
 
     def _reset_filters(self):
         try:
@@ -229,8 +322,8 @@ class FiltersMixin:
             self.player.contrast = 0
             self.player.saturation = 0
             self.player.gamma = 0
-            self.player["af"] = ""
         except Exception:
             pass
+        self._reset_audio_eq()
         self._rebuild_filters_menu()
 

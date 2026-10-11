@@ -19,6 +19,7 @@ on Wayland or GLX on X11, so we don't need to special-case either backend.
 """
 import ctypes
 import ctypes.util
+import datetime
 import json
 import os
 from pathlib import Path
@@ -215,6 +216,34 @@ _IINA_CSS = b"""
     color: #8e8e93;
 }
 
+.iina-history-row {
+    background-color: transparent;
+    border-radius: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    transition: background-color 150ms ease;
+}
+
+.iina-history-row:hover {
+    background-color: rgba(255, 255, 255, 0.09);
+}
+
+.iina-eq-band-box {
+    padding: 2px 4px;
+}
+
+.iina-eq-val-lbl {
+    font-size: 10px;
+    color: #98989d;
+    font-feature-settings: "tnum";
+}
+
+.iina-eq-hz-lbl {
+    font-size: 10px;
+    font-weight: 600;
+    color: #d1d1d6;
+}
+
 .iina-toast {
     background-color: rgba(20, 20, 22, 0.88);
     border: 1px solid rgba(255, 255, 255, 0.18);
@@ -267,6 +296,9 @@ def _load_config():
                 data.setdefault("osd_hide_ms", 3000)
                 data.setdefault("loop_mode", "off")
                 data.setdefault("shuffle", False)
+                data.setdefault("audio_eq_preset", "flat")
+                data.setdefault("audio_eq_gains", [0.0] * 10)
+                data.setdefault("audio_special_effect", "none")
                 try:
                     CONFIG_DIR.chmod(0o700)
                     CONFIG_FILE.chmod(0o600)
@@ -291,6 +323,9 @@ def _load_config():
         "osd_hide_ms": 3000,
         "loop_mode": "off",
         "shuffle": False,
+        "audio_eq_preset": "flat",
+        "audio_eq_gains": [0.0] * 10,
+        "audio_special_effect": "none",
     }
 
 

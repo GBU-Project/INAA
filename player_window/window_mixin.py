@@ -170,6 +170,14 @@ class WindowMixin:
         btn_shuffle.connect("clicked", shuffle_action)
         box.append(btn_shuffle)
 
+        btn_hist = Gtk.Button(label="Riwayat Pemutaran (Ctrl+H)")
+        btn_hist.set_icon_name("document-open-recent-symbolic")
+        def hist_action(_):
+            self.video_context_popover.popdown()
+            self.open_history_dialog()
+        btn_hist.connect("clicked", hist_action)
+        box.append(btn_hist)
+
         btn_prefs = Gtk.Button(label="Pengaturan (Ctrl+P)")
         btn_prefs.set_icon_name("preferences-system-symbolic")
         def prefs_action(_):
@@ -398,6 +406,146 @@ class WindowMixin:
         bottom_box.append(btn_reset_all)
         content.append(bottom_box)
 
+        dialog.connect("response", lambda d, r: d.destroy())
+        dialog.show()
+
+    def open_history_dialog(self, _button=None):
+        """Membuka jendela Riwayat Pemutaran dengan pencarian (ala IINA Playback History)."""
+        dialog = Gtk.Dialog(
+            title="Riwayat Pemutaran",
+            transient_for=self,
+            modal=True,
+        )
+        dialog.add_buttons("Tutup", Gtk.ResponseType.CLOSE)
+        dialog.set_default_size(620, 520)
+
+        content = dialog.get_content_area()
+        content.set_margin_start(16)
+        content.set_margin_end(16)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        content.set_spacing(10)
+
+        # Header bar search & clear
+        top_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        search_entry = Gtk.SearchEntry()
+        search_entry.set_placeholder_text("Cari riwayat (nama file, judul, path)...")
+        search_entry.set_hexpand(True)
+        top_bar.append(search_entry)
+
+        btn_clear = Gtk.Button(label="Bersihkan Riwayat")
+        btn_clear.add_css_class("destructive-action")
+        top_bar.append(btn_clear)
+        content.append(top_bar)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        listbox = Gtk.ListBox()
+        listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        scroll.set_child(listbox)
+        content.append(scroll)
+
+        def populate_history(query=""):
+            child = listbox.get_first_child()
+            while child:
+                nxt = child.get_next_sibling()
+                listbox.remove(child)
+                child = nxt
+
+            recents = self._config.get("recent_files", [])
+            query_lower = query.strip().lower()
+
+            filtered = []
+            for item in recents:
+                p = item.get("path", "")
+                t = item.get("title", "")
+                if not query_lower or query_lower in p.lower() or query_lower in t.lower():
+                    filtered.append(item)
+
+            if not filtered:
+                empty_lbl = Gtk.Label(label="Tidak ada riwayat pemutaran yang cocok" if query_lower else "Belum ada riwayat pemutaran")
+                empty_lbl.add_css_class("dim-label")
+                empty_lbl.set_valign(Gtk.Align.CENTER)
+                empty_lbl.set_vexpand(True)
+                listbox.append(empty_lbl)
+                return
+
+            for item in filtered:
+                path = item.get("path")
+                if not path:
+                    continue
+
+                row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+                row.add_css_class("iina-history-row")
+
+                icon_name = "audio-x-generic-symbolic" if os.path.splitext(path)[1].lower() in AUDIO_EXTENSIONS else "video-x-generic-symbolic"
+                img = Gtk.Image.new_from_icon_name(icon_name)
+                img.set_pixel_size(24)
+                img.set_valign(Gtk.Align.CENTER)
+                row.append(img)
+
+                info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+                info_box.set_hexpand(True)
+
+                title_txt = item.get("title") or _display_name(path)
+                t_lbl = Gtk.Label(label=title_txt)
+                t_lbl.set_halign(Gtk.Align.START)
+                t_lbl.set_ellipsize(Pango.EllipsizeMode.END)
+                t_lbl.add_css_class("iina-recent-title")
+                info_box.append(t_lbl)
+
+                pos = item.get("position", 0)
+                dur = item.get("duration", 0)
+                last_played = item.get("last_played", "")
+
+                details = []
+                if dur > 0 and pos > 0:
+                    pct = int((pos / dur) * 100)
+                    details.append(f"Posisi: {_format_time(pos)} / {_format_time(dur)} ({pct}%)")
+                elif dur > 0:
+                    details.append(f"Durasi: {_format_time(dur)}")
+
+                if last_played:
+                    details.append(f"Terakhir: {last_played}")
+
+                sub_txt = " • ".join(details) if details else path
+                s_lbl = Gtk.Label(label=sub_txt)
+                s_lbl.set_halign(Gtk.Align.START)
+                s_lbl.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+                s_lbl.add_css_class("iina-recent-sub")
+                info_box.append(s_lbl)
+
+                # Path kecil
+                p_lbl = Gtk.Label(label=path)
+                p_lbl.set_halign(Gtk.Align.START)
+                p_lbl.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+                p_lbl.add_css_class("dim-label")
+                info_box.append(p_lbl)
+
+                row.append(info_box)
+
+                play_btn = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
+                play_btn.set_tooltip_text("Putar dan lanjutkan")
+                play_btn.set_valign(Gtk.Align.CENTER)
+                def on_play_clicked(_b, p=path, resume_pos=pos):
+                    dialog.destroy()
+                    self.open_file(p, resume_pos=resume_pos)
+                play_btn.connect("clicked", on_play_clicked)
+                row.append(play_btn)
+
+                # Gesture click row
+                gesture = Gtk.GestureClick()
+                gesture.connect("released", lambda _g, _n, _x, _y, p=path, resume_pos=pos: on_play_clicked(None, p, resume_pos))
+                row.add_controller(gesture)
+
+                listbox.append(row)
+
+        search_entry.connect("search-changed", lambda e: populate_history(e.get_text()))
+        btn_clear.connect("clicked", lambda *_: (self._clear_recent_files(), populate_history(search_entry.get_text())))
+
+        populate_history()
         dialog.connect("response", lambda d, r: d.destroy())
         dialog.show()
 

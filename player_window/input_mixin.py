@@ -125,6 +125,7 @@ class InputMixin:
             "chapter_next": lambda: self.navigate_chapter(1),
             "open_file": lambda: self.on_open_clicked(None),
             "open_url": lambda: self.on_open_url_clicked(None),
+            "history": lambda: self.open_history_dialog(None),
             "edit_shortcuts": lambda: self.open_shortcuts_editor(None),
             "preferences": lambda: self.open_preferences(None),
         }
