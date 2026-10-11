@@ -55,6 +55,12 @@ class TestAudioFilters(unittest.TestCase):
         af = audio_filters.compose_af_string([0.0] * 10, evil_effect)
         self.assertEqual(af, "")
 
+    def test_custom_presets_filtering(self):
+        custom_gains = [1.0, 2.0, 3.0, 4.0, 5.0, -1.0, -2.0, -3.0, -4.0, -5.0]
+        filt = audio_filters.build_equalizer_filter(custom_gains)
+        self.assertIn("equalizer=f=31.25:width_type=o:w=1:g=1.0", filt)
+        self.assertIn("equalizer=f=16000:width_type=o:w=1:g=-5.0", filt)
+
 
 if __name__ == "__main__":
     unittest.main()

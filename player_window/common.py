@@ -255,6 +255,31 @@ _IINA_CSS = b"""
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     margin-top: 24px;
 }
+
+.iina-thumb-grid-item {
+    border-radius: 4px;
+    overflow: hidden;
+    transition: transform 120ms ease-out;
+}
+
+.iina-thumb-grid-item:hover {
+    transform: scale(1.08);
+    z-index: 1;
+}
+
+.iina-thumb-time-label {
+    background-color: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.iina-shader-active {
+    color: #4ade80;
+    font-weight: 600;
+}
 """
 
 def _apply_iina_css():
@@ -299,6 +324,7 @@ def _load_config():
                 data.setdefault("audio_eq_preset", "flat")
                 data.setdefault("audio_eq_gains", [0.0] * 10)
                 data.setdefault("audio_special_effect", "none")
+                data.setdefault("audio_custom_presets", {})
                 try:
                     CONFIG_DIR.chmod(0o700)
                     CONFIG_FILE.chmod(0o600)
@@ -326,6 +352,7 @@ def _load_config():
         "audio_eq_preset": "flat",
         "audio_eq_gains": [0.0] * 10,
         "audio_special_effect": "none",
+        "audio_custom_presets": {},
     }
 
 

@@ -210,7 +210,7 @@ class InputMixin:
                 fraction = max(0.0, min(1.0, x / alloc_width))
                 hover_time = fraction * duration
                 time_str = _format_time(hover_time)
-                self.thumb_label.set_text(time_str)
+                self.thumb_time_label.set_text(time_str)
 
                 rect = Gdk.Rectangle()
                 rect.x = int(x)
@@ -220,17 +220,148 @@ class InputMixin:
                 self.thumb_popover.set_pointing_to(rect)
                 self.thumb_popover.popup()
 
-                # Request thumbnail frame jika bukan URL online dan bukan file audio
+                # Request thumbnail grid if local video file
                 if is_local_media_file(self._current_path):
                     ext = os.path.splitext(self._current_path)[1].lower()
                     if ext not in AUDIO_EXTENSIONS:
-                        self._request_thumbnail(int(hover_time))
+                        self._request_thumbnail_grid(int(hover_time))
         except Exception:
             pass
 
     def _on_seekbar_leave(self, controller):
         self.thumb_popover.popdown()
 
+    def _request_thumbnail_grid(self, hover_sec):
+        """Generate a 5x5 thumbnail grid centered around hover_sec using ffmpeg."""
+        path = self._current_path
+        if not is_local_media_file(path):
+            return
+
+        # Generate grid key based on the center time (rounded to 10-second intervals for caching)
+        grid_center = (hover_sec // 10) * 10
+        grid_key = f"grid_{grid_center}"
+
+        if grid_key in self._thumb_cache:
+            self._populate_thumb_grid(self._thumb_cache[grid_key])
+            return
+        if grid_key in self._thumb_pending:
+            return
+
+        self._thumb_pending.add(grid_key)
+        media_path = os.path.realpath(path)
+
+        def extract_grid():
+            # Extract 25 frames: 12 before, center, 12 after (each ~2 seconds apart = ~50s window)
+            # Using ffmpeg's tile filter to create a single image with 5x5 grid
+            out_file = os.path.join(self._thumb_temp_dir, f"{grid_key}.jpg")
+            try:
+                # Calculate start time (center - 24 seconds, but not less than 0)
+                start_sec = max(0, grid_center - 24)
+                # Use fps=1/2 to get a frame every 2 seconds, then tile 5x5
+                cmd = [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-nostdin",
+                    "-protocol_whitelist", "file",
+                    "-ss", str(start_sec),
+                    "-i", media_path,
+                    "-vf", "fps=1/2,scale=160:90,tile=5x5",
+                    "-vframes", "1",
+                    "-f", "image2",
+                    "-y", out_file,
+                ]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                if os.path.isfile(out_file):
+                    self._thumb_cache[grid_key] = out_file
+                    GLib.idle_add(lambda: self._populate_thumb_grid(out_file))
+            except Exception:
+                pass
+            finally:
+                self._thumb_pending.discard(grid_key)
+
+        threading.Thread(target=extract_grid, daemon=True).start()
+
+    def _populate_thumb_grid(self, grid_image_path):
+        """Populate the FlowBox with 25 thumbnails sliced from the grid image."""
+        try:
+            # Clear existing children
+            child = self.thumb_grid.get_first_child()
+            while child:
+                nxt = child.get_next_sibling()
+                self.thumb_grid.remove(child)
+                child = nxt
+
+            # Load the grid image and slice into 5x5
+            from gi.repository import GdkPixbuf
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file(grid_image_path)
+            if not pixbuf:
+                return
+
+            grid_w = pixbuf.get_width()
+            grid_h = pixbuf.get_height()
+            thumb_w = grid_w // 5
+            thumb_h = grid_h // 5
+
+            duration = self.player.duration or 0
+            if duration <= 0:
+                return
+
+            grid_center = (int(self.thumb_time_label.get_text().split(':')[-1]) // 10) * 10 if ':' in self.thumb_time_label.get_text() else 0
+            start_sec = max(0, grid_center - 24)
+
+            for row in range(5):
+                for col in range(5):
+                    idx = row * 5 + col
+                    sec = start_sec + idx * 2
+                    if sec > duration:
+                        break
+
+                    # Create sub-pixbuf for this thumbnail
+                    sub_pixbuf = GdkPixbuf.Pixbuf.new_subpixbuf(
+                        pixbuf,
+                        col * thumb_w,
+                        row * thumb_h,
+                        thumb_w,
+                        thumb_h
+                    )
+
+                    picture = Gtk.Picture()
+                    picture.set_pixbuf(sub_pixbuf)
+                    picture.set_size_request(160, 90)
+                    picture.add_css_class("iina-thumb-grid-item")
+
+                    # Add time label overlay
+                    time_label = Gtk.Label(label=_format_time(sec))
+                    time_label.add_css_class("iina-thumb-time-label")
+                    time_label.set_halign(Gtk.Align.END)
+                    time_label.set_valign(Gtk.Align.END)
+                    time_label.set_margin_end(4)
+                    time_label.set_margin_bottom(4)
+
+                    # Wrap in overlay for time label
+                    overlay = Gtk.Overlay()
+                    overlay.set_child(picture)
+                    overlay.add_overlay(time_label)
+
+                    # Click to seek
+                    gesture = Gtk.GestureClick()
+                    gesture.connect("released", lambda *_, s=sec: self._seek_to_time(s))
+                    overlay.add_controller(gesture)
+
+                    self.thumb_grid.append(overlay)
+        except Exception:
+            pass
+
+    def _seek_to_time(self, sec):
+        """Seek to a specific time and close the thumbnail popover."""
+        try:
+            self.player.seek(sec, reference="absolute", precision="exact")
+            self.thumb_popover.popdown()
+        except Exception:
+            pass
+
+    # Legacy single thumbnail methods (kept for compatibility)
     def _request_thumbnail(self, sec):
         path = self._current_path
         if not is_local_media_file(path):

@@ -27,12 +27,13 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
   - **Scroll Vertikal**: Mengatur volume suara secara halus dengan toast umpan balik visual instan.
   - **Scroll Horizontal**: Scrubbing dan seeking video maju/mundur dengan akurat.
 - **Playback History & Resume Otomatis (`Ctrl+H`)**:
-  - Jendela Riwayat Pemutaran khusus ala IINA dengan kotak pencarian instan (nama file, judul, path).
+  - Jendela Riwayat Pemutaran khusus ala IINA dengan kotak pencarian instan (nama file, judul, path) dan konfirmasi proteksi saat menghapus riwayat.
   - Menyimpan path file, waktu terakhir diputar, durasi, dan posisi resume (hingga 100 berkas).
   - Klik pada riwayat untuk langsung melanjutkan pemutaran disertai notifikasi toast status.
 - **Audio Equalizer 10-Band & Filter Audio Aman**:
   - Equalizer 10 band standar ISO (31Hz hingga 16kHz) dengan rentang gain -12 dB hingga +12 dB di tab Inspector Audio (`i`).
   - Berbagai preset equalizer instan: *Flat, Bass Boost, Vocal Boost, Rock, Pop, Classic, Electro, Acoustic, Party*.
+  - **Dukungan Custom Preset**: Simpan kombinasi frekuensi favorit dengan nama kustom langsung dari panel Inspector.
   - Efek audio khusus terisolasi: *Night Mode* (Dynamic Range Compression), *Karaoke* (Center Vocal Reducer), dan *Clarity Boost*.
   - Delay audio dan delay subtitle (-5s s/d +5s) dengan sinkronisasi presisi.
   - Seluruh parameter filter audio dibangun lewat allowlist divalidasi ketat (`audio_filters.py`), bukan membuka celah opsi `af` mentah dari `mpv.conf`.

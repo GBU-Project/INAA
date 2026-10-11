@@ -435,6 +435,30 @@ class WindowMixin:
 
         btn_clear = Gtk.Button(label="Bersihkan Riwayat")
         btn_clear.add_css_class("destructive-action")
+
+        confirm_popover = Gtk.Popover()
+        confirm_popover.set_parent(btn_clear)
+        confirm_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        confirm_box.set_margin_start(10)
+        confirm_box.set_margin_end(10)
+        confirm_box.set_margin_top(8)
+        confirm_box.set_margin_bottom(8)
+        lbl_confirm = Gtk.Label(label="Hapus semua riwayat pemutaran?")
+        lbl_confirm.add_css_class("iina-sec-title")
+        confirm_box.append(lbl_confirm)
+
+        btn_confirm_clear = Gtk.Button(label="Ya, Hapus Semua")
+        btn_confirm_clear.add_css_class("destructive-action")
+        def on_confirm_clear_clicked(_b):
+            confirm_popover.popdown()
+            self._clear_recent_files()
+            populate_history(search_entry.get_text())
+            self.show_toast("Riwayat pemutaran dibersihkan")
+        btn_confirm_clear.connect("clicked", on_confirm_clear_clicked)
+        confirm_box.append(btn_confirm_clear)
+        confirm_popover.set_child(confirm_box)
+
+        btn_clear.connect("clicked", lambda *_: confirm_popover.popup())
         top_bar.append(btn_clear)
         content.append(top_bar)
 
@@ -543,8 +567,6 @@ class WindowMixin:
                 listbox.append(row)
 
         search_entry.connect("search-changed", lambda e: populate_history(e.get_text()))
-        btn_clear.connect("clicked", lambda *_: (self._clear_recent_files(), populate_history(search_entry.get_text())))
-
         populate_history()
         dialog.connect("response", lambda d, r: d.destroy())
         dialog.show()

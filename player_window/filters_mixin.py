@@ -14,6 +14,7 @@ class FiltersMixin:
         self.inspector_panel.set_visible(visible)
         if visible:
             self._refresh_inspector_tracks()
+            self._refresh_shader_ui()
 
     def _set_hwdec(self, mode):
         try:
@@ -149,6 +150,81 @@ class FiltersMixin:
             else:
                 self.insp_shader_status_label.set_text("Tidak ada shader aktif")
 
+        # Refresh available shaders list
+        if hasattr(self, "shader_listbox"):
+            self._refresh_available_shaders_list()
+
+    def _refresh_available_shaders_list(self):
+        """Populate the available shaders list from SHADERS_DIR."""
+        child = self.shader_listbox.get_first_child()
+        while child:
+            nxt = child.get_next_sibling()
+            self.shader_listbox.remove(child)
+            child = nxt
+
+        shaders_dir = SHADERS_DIR
+        if not shaders_dir.exists():
+            shaders_dir.mkdir(parents=True, exist_ok=True)
+
+        current_shaders = set(self._config.get("custom_shaders", []))
+        active_names = {os.path.basename(s) for s in current_shaders}
+
+        try:
+            for entry in sorted(shaders_dir.iterdir()):
+                if entry.is_file() and entry.suffix.lower() in {".glsl", ".hook", ".frag"}:
+                    row = Gtk.ListBoxRow()
+                    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+                    box.set_margin_start(8)
+                    box.set_margin_end(8)
+                    box.set_margin_top(4)
+                    box.set_margin_bottom(4)
+
+                    name = entry.name
+                    is_active = name in active_names
+
+                    lbl = Gtk.Label(label=name)
+                    lbl.set_xalign(0)
+                    lbl.set_hexpand(True)
+                    if is_active:
+                        lbl.add_css_class("iina-shader-active")
+                    box.append(lbl)
+
+                    if is_active:
+                        btn = Gtk.Button.new_from_icon_name("edit-clear-symbolic")
+                        btn.set_tooltip_text("Nonaktifkan shader ini")
+                        btn.set_has_frame(False)
+                        def make_remove(n=name, p=str(entry)):
+                            return lambda _: self._remove_custom_shader(p)
+                        btn.connect("clicked", make_remove())
+                    else:
+                        btn = Gtk.Button.new_from_icon_name("emblem-default-symbolic")
+                        btn.set_tooltip_text("Aktifkan shader ini")
+                        btn.set_has_frame(False)
+                        def make_add(p=str(entry)):
+                            return lambda _: self._add_custom_shader(p)
+                        btn.connect("clicked", make_add())
+                    btn.set_valign(Gtk.Align.CENTER)
+                    box.append(btn)
+
+                    row.set_child(box)
+                    self.shader_listbox.append(row)
+        except Exception:
+            pass
+
+    def _remove_custom_shader(self, shader_path):
+        """Menghapus shader dari daftar aktif."""
+        current = list(self._config.get("custom_shaders", []))
+        if shader_path in current:
+            current.remove(shader_path)
+            self._config["custom_shaders"] = current
+            self._save_config_throttled(force=True)
+        try:
+            self.player["glsl-shaders"] = current
+            self.show_toast(f"Shader dinonaktifkan: {os.path.basename(shader_path)}")
+        except Exception as e:
+            self.show_toast(f"Gagal menghapus shader: {e}")
+        self._refresh_shader_ui()
+
     def _rebuild_filters_menu(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.set_margin_start(12)
@@ -256,7 +332,8 @@ class FiltersMixin:
         self._save_config_throttled()
 
     def _set_audio_eq_preset(self, preset_name):
-        """Menerapkan preset equalizer 10-band."""
+        """Menerapkan preset equalizer 10-band (preset bawaan maupun kustom)."""
+        custom_presets = self._config.get("audio_custom_presets", {})
         if preset_name in audio_filters.EQ_PRESETS:
             gains = list(audio_filters.EQ_PRESETS[preset_name])
             self._config["audio_eq_gains"] = gains
@@ -266,6 +343,43 @@ class FiltersMixin:
             self._sync_eq_sliders_ui()
             p_label = preset_name.replace("_", " ").title()
             self.show_toast(f"🎚 Equalizer Preset: {p_label}")
+        elif preset_name in custom_presets:
+            gains = list(custom_presets[preset_name])
+            self._config["audio_eq_gains"] = gains
+            self._config["audio_eq_preset"] = preset_name
+            self._apply_audio_filters()
+            self._save_config_throttled(force=True)
+            self._sync_eq_sliders_ui()
+            self.show_toast(f"🎚 Custom Preset: {preset_name}")
+
+    def _save_custom_eq_preset(self, name):
+        """Menyimpan gain equalizer saat ini ke preset kustom dengan nama yang diberikan."""
+        name = name.strip()
+        if not name:
+            return False
+        custom_presets = self._config.get("audio_custom_presets", {})
+        gains = [audio_filters.clamp_gain(g) for g in self._config.get("audio_eq_gains", [0.0] * 10)]
+        custom_presets[name] = gains
+        self._config["audio_custom_presets"] = custom_presets
+        self._config["audio_eq_preset"] = name
+        self._save_config_throttled(force=True)
+        if hasattr(self, "_refresh_custom_eq_presets_ui"):
+            self._refresh_custom_eq_presets_ui()
+        self.show_toast(f"Preset '{name}' disimpan")
+        return True
+
+    def _delete_custom_eq_preset(self, name):
+        """Menghapus preset kustom yang tersimpan."""
+        custom_presets = self._config.get("audio_custom_presets", {})
+        if name in custom_presets:
+            del custom_presets[name]
+            self._config["audio_custom_presets"] = custom_presets
+            if self._config.get("audio_eq_preset") == name:
+                self._config["audio_eq_preset"] = "custom"
+            self._save_config_throttled(force=True)
+            if hasattr(self, "_refresh_custom_eq_presets_ui"):
+                self._refresh_custom_eq_presets_ui()
+            self.show_toast(f"Preset '{name}' dihapus")
 
     def _set_audio_special_effect(self, effect_name):
         """Menerapkan efek audio khusus (nightmode, karaoke, clarity, atau none)."""

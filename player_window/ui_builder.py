@@ -234,17 +234,39 @@ class UIBuilderMixin:
         seek_row.append(self.duration_label)
         self.osd_box.append(seek_row)
 
-        # Popover thumbnail preview saat hover seekbar
+        # Popover thumbnail GRID preview saat hover seekbar (IINA-style)
         self.thumb_popover = Gtk.Popover()
         self.thumb_popover.set_parent(self.seekbar)
         self.thumb_popover.set_position(Gtk.PositionType.TOP)
         self.thumb_popover.set_autohide(False)
-        self.thumb_picture = Gtk.Picture()
-        self.thumb_picture.set_size_request(160, 90)
-        self.thumb_label = Gtk.Label(label="00:00")
-        thumb_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        thumb_box.append(self.thumb_picture)
-        thumb_box.append(self.thumb_label)
+        self.thumb_popover.set_has_arrow(True)
+
+        # Grid container for thumbnails (5x5 = 25 thumbnails like IINA)
+        self.thumb_grid = Gtk.FlowBox()
+        self.thumb_grid.set_valign(Gtk.Align.START)
+        self.thumb_grid.set_max_children_per_line(5)
+        self.thumb_grid.set_min_children_per_line(5)
+        self.thumb_grid.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.thumb_grid.set_column_spacing(4)
+        self.thumb_grid.set_row_spacing(4)
+        self.thumb_grid.set_margin_start(8)
+        self.thumb_grid.set_margin_end(8)
+        self.thumb_grid.set_margin_top(8)
+        self.thumb_grid.set_margin_bottom(8)
+
+        thumb_scroll = Gtk.ScrolledWindow()
+        thumb_scroll.set_child(self.thumb_grid)
+        thumb_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        thumb_scroll.set_size_request(420, 340)
+
+        self.thumb_time_label = Gtk.Label(label="00:00")
+        self.thumb_time_label.add_css_class("iina-time-label")
+        self.thumb_time_label.set_halign(Gtk.Align.CENTER)
+        self.thumb_time_label.set_margin_bottom(4)
+
+        thumb_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        thumb_box.append(self.thumb_time_label)
+        thumb_box.append(thumb_scroll)
         self.thumb_popover.set_child(thumb_box)
 
         # Buttons row
@@ -522,6 +544,10 @@ class UIBuilderMixin:
         tab_sub = self._build_sub_tab()
         self.insp_stack.add_titled(tab_sub, "subtitles", "SUBTITLE")
 
+        # Tab 4: SHADER (GLSL / mpv shaders)
+        tab_shader = self._build_shader_tab()
+        self.insp_stack.add_titled(tab_shader, "shaders", "SHADER")
+
         scroll = Gtk.ScrolledWindow()
         scroll.set_child(self.insp_stack)
         scroll.set_vexpand(True)
@@ -780,6 +806,51 @@ class UIBuilderMixin:
             eq_presets_box2.append(btn_p)
         box.append(eq_presets_box2)
 
+        # Custom presets row (Simpan Preset Kustom & Tombol-tombol preset pengguna)
+        custom_save_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        custom_save_row.set_margin_top(4)
+
+        preset_name_entry = Gtk.Entry()
+        preset_name_entry.set_placeholder_text("Nama preset kustom...")
+        preset_name_entry.set_hexpand(True)
+        custom_save_row.append(preset_name_entry)
+
+        btn_save_preset = Gtk.Button(label="Simpan")
+        btn_save_preset.add_css_class("iina-seg-btn")
+        def on_save_clicked(_b):
+            name = preset_name_entry.get_text().strip()
+            if self._save_custom_eq_preset(name):
+                preset_name_entry.set_text("")
+        btn_save_preset.connect("clicked", on_save_clicked)
+        preset_name_entry.connect("activate", lambda *_: on_save_clicked(None))
+        custom_save_row.append(btn_save_preset)
+        box.append(custom_save_row)
+
+        self.custom_presets_flow = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        def refresh_custom_presets_ui():
+            child = self.custom_presets_flow.get_first_child()
+            while child:
+                nxt = child.get_next_sibling()
+                self.custom_presets_flow.remove(child)
+                child = nxt
+            custom_map = self._config.get("audio_custom_presets", {})
+            for c_name in sorted(custom_map.keys()):
+                tag_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+                tag_box.add_css_class("iina-seg-btn")
+                btn_load_c = Gtk.Button(label=c_name)
+                btn_load_c.set_has_frame(False)
+                btn_load_c.connect("clicked", lambda _b, n=c_name: self._set_audio_eq_preset(n))
+                tag_box.append(btn_load_c)
+                btn_del_c = Gtk.Button.new_from_icon_name("window-close-symbolic")
+                btn_del_c.set_has_frame(False)
+                btn_del_c.set_tooltip_text(f"Hapus preset {c_name}")
+                btn_del_c.connect("clicked", lambda _b, n=c_name: self._delete_custom_eq_preset(n))
+                tag_box.append(btn_del_c)
+                self.custom_presets_flow.append(tag_box)
+        self._refresh_custom_eq_presets_ui = refresh_custom_presets_ui
+        refresh_custom_presets_ui()
+        box.append(self.custom_presets_flow)
+
         # 10 Vertical Sliders
         eq_sliders_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         eq_sliders_container.set_halign(Gtk.Align.CENTER)
@@ -991,6 +1062,57 @@ class UIBuilderMixin:
                 pass
         self.sub_box_chk.connect("toggled", on_sub_box_toggled)
         box.append(self.sub_box_chk)
+
+        return box
+
+    def _build_shader_tab(self):
+        """Build the SHADER tab for managing GLSL/mpv shaders."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+        box.set_margin_top(6)
+        box.set_margin_bottom(12)
+
+        # Active shaders list
+        lbl_active = Gtk.Label(label="Shader Aktif:")
+        lbl_active.set_xalign(0)
+        lbl_active.add_css_class("iina-sec-title")
+        box.append(lbl_active)
+
+        self.insp_shader_status_label = Gtk.Label(label="Tidak ada shader aktif")
+        self.insp_shader_status_label.set_xalign(0)
+        self.insp_shader_status_label.set_wrap(True)
+        self.insp_shader_status_label.add_css_class("dim-label")
+        box.append(self.insp_shader_status_label)
+
+        # Action buttons
+        action_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        btn_add = Gtk.Button(label="Tambah Shader...")
+        btn_add.add_css_class("iina-seg-btn")
+        btn_add.connect("clicked", self._open_shader_chooser)
+        action_row.append(btn_add)
+
+        btn_clear = Gtk.Button(label="Hapus Semua")
+        btn_clear.add_css_class("iina-seg-btn")
+        btn_clear.connect("clicked", lambda *_: self._clear_custom_shaders())
+        action_row.append(btn_clear)
+        box.append(action_row)
+
+        # Available shaders from SHADERS_DIR
+        lbl_avail = Gtk.Label(label="Shader Tersedia (~/.config/inaa/shaders/):")
+        lbl_avail.set_xalign(0)
+        lbl_avail.add_css_class("iina-sec-title")
+        lbl_avail.set_margin_top(8)
+        box.append(lbl_avail)
+
+        self.shader_listbox = Gtk.ListBox()
+        self.shader_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        shader_scroll = Gtk.ScrolledWindow()
+        shader_scroll.set_child(self.shader_listbox)
+        shader_scroll.set_vexpand(True)
+        shader_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        shader_scroll.set_size_request(-1, 180)
+        box.append(shader_scroll)
 
         return box
 
