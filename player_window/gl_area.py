@@ -9,7 +9,7 @@ class MpvGLArea(Gtk.GLArea):
         "mpv-event": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
-    def __init__(self):
+    def __init__(self, use_mpv_conf=False):
         super().__init__()
         self.set_has_depth_buffer(False)
         self.set_has_stencil_buffer(False)
@@ -23,19 +23,31 @@ class MpvGLArea(Gtk.GLArea):
             except Exception:
                 pass
 
-        self.player = mpv.MPV(
-            input_default_bindings=False,
-            input_vo_keyboard=False,
-            osc=False,
-            vo="libmpv",
-            hwdec="auto-safe",
-            sub_auto="exact",
-            audio_file_auto="no",
-            ytdl="no",
-            ytdl_format="bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
-            config="no",
-            load_scripts="no",
-        )
+        mpv_kwargs = {
+            "input_default_bindings": False,
+            "input_vo_keyboard": False,
+            "osc": False,
+            "vo": "libmpv",
+            "hwdec": "auto-safe",
+            "sub_auto": "exact",
+            "audio_file_auto": "no",
+            "ytdl": "no",
+            "ytdl_format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+            "load_scripts": "no",
+            "config": bool(use_mpv_conf),
+        }
+
+        self.player = mpv.MPV(**mpv_kwargs)
+
+        # Precedence: setting kritis UI INAA tidak boleh tertimpa opsi mpv.conf
+        try:
+            self.player["vo"] = "libmpv"
+            self.player["osc"] = False
+            self.player["input-default-bindings"] = False
+            self.player["input-vo-keyboard"] = False
+        except Exception:
+            pass
+
         self.player.volume = 100
         self._render_ctx = None
 

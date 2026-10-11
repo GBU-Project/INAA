@@ -125,9 +125,7 @@ class InputMixin:
             "chapter_next": lambda: self.navigate_chapter(1),
             "open_file": lambda: self.on_open_clicked(None),
             "open_url": lambda: self.on_open_url_clicked(None),
-            # "history" dan "edit_shortcuts" sengaja tidak dipetakan: belum
-            # ada popover riwayat / dialog pengaturan shortcut di UI. Begitu
-            # itu dibuat, tinggal tambahkan entrinya di sini.
+            "edit_shortcuts": lambda: self.open_shortcuts_editor(None),
         }
 
     def _toggle_inspector_shortcut(self):
@@ -139,6 +137,9 @@ class InputMixin:
         if not path or not os.path.isfile(path):
             return False
         ext = os.path.splitext(path)[1].lower()
+        if ext in (".m3u", ".m3u8"):
+            self.load_m3u_file(path)
+            return True
         if ext in SUBTITLE_EXTENSIONS:
             self._add_and_select_subtitle(path)
             return True

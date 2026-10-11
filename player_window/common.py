@@ -26,7 +26,13 @@ import shutil
 import subprocess
 import time
 
-from keybindings import combo_from_event, invert_shortcuts, merge_shortcuts
+from keybindings import (
+    DEFAULT_SHORTCUTS,
+    SHORTCUT_LABELS,
+    combo_from_event,
+    invert_shortcuts,
+    merge_shortcuts,
+)
 from media_uri import (
     is_allowed_media_uri,
     is_http_media_uri,
@@ -34,6 +40,8 @@ from media_uri import (
     normalize_media_uri,
 )
 from opensubtitles import download_subtitle, search_subtitles
+from fmt import format_speed
+from m3u_parser import export_m3u, parse_m3u
 from plugin_loader import load_plugins
 
 # mpv internal parser & shader compiler requires LC_NUMERIC="C"
@@ -83,6 +91,7 @@ def _format_time(seconds):
 CONFIG_DIR = Path.home() / ".config" / "inaa"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 PLUGINS_DIR = CONFIG_DIR / "plugins"
+SHADERS_DIR = CONFIG_DIR / "shaders"
 
 _IINA_CSS = b"""
 /* INAA macOS Glassmorphism Theme */
@@ -242,6 +251,8 @@ def _load_config():
                 data.setdefault("recent_files", [])
                 data.setdefault("enabled_plugins", [])
                 data.setdefault("shortcuts", {})
+                data.setdefault("use_mpv_conf", False)
+                data.setdefault("custom_shaders", [])
                 try:
                     CONFIG_DIR.chmod(0o700)
                     CONFIG_FILE.chmod(0o600)
@@ -257,6 +268,8 @@ def _load_config():
         "recent_files": [],
         "enabled_plugins": [],
         "shortcuts": {},
+        "use_mpv_conf": False,
+        "custom_shaders": [],
     }
 
 

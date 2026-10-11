@@ -205,3 +205,81 @@ class PlaylistMixin:
         if 0 <= index < len(self.playlist):
             self.open_file(self.playlist[index])
 
+    def load_m3u_file(self, m3u_path):
+        """Memuat daftar putar dari berkas .m3u / .m3u8."""
+        entries = parse_m3u(m3u_path)
+        if not entries:
+            self.show_toast("Daftar putar kosong atau tidak valid")
+            return
+        self.playlist = entries
+        self.playlist_index = 0
+        self._refresh_sidebar()
+        self.open_file(self.playlist[0])
+        self.show_toast(f"Memuat {len(entries)} trek dari playlist")
+
+    def _open_m3u_dialog(self, _button=None):
+        dialog = Gtk.FileChooserDialog(
+            title="Buka Playlist M3U",
+            transient_for=self,
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        dialog.add_buttons(
+            "_Batal", Gtk.ResponseType.CANCEL,
+            "_Buka", Gtk.ResponseType.OK,
+        )
+        f_filter = Gtk.FileFilter()
+        f_filter.set_name("Playlist (*.m3u, *.m3u8)")
+        f_filter.add_pattern("*.m3u")
+        f_filter.add_pattern("*.m3u8")
+        dialog.add_filter(f_filter)
+
+        def on_response(dlg, resp):
+            if resp == Gtk.ResponseType.OK:
+                gfile = dlg.get_file()
+                if gfile:
+                    path = gfile.get_path()
+                    if path:
+                        self.load_m3u_file(path)
+            dlg.destroy()
+
+        dialog.connect("response", on_response)
+        dialog.show()
+
+    def _export_m3u_dialog(self, _button=None):
+        if not self.playlist:
+            self.show_toast("Playlist saat ini kosong")
+            return
+        dialog = Gtk.FileChooserDialog(
+            title="Simpan Playlist M3U",
+            transient_for=self,
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        dialog.add_buttons(
+            "_Batal", Gtk.ResponseType.CANCEL,
+            "_Simpan", Gtk.ResponseType.OK,
+        )
+        dialog.set_current_name("playlist.m3u")
+
+        def on_response(dlg, resp):
+            if resp == Gtk.ResponseType.OK:
+                gfile = dlg.get_file()
+                if gfile:
+                    path = gfile.get_path()
+                    if path:
+                        if not path.endswith(".m3u") and not path.endswith(".m3u8"):
+                            path += ".m3u"
+                        if export_m3u(path, self.playlist):
+                            self.show_toast("Playlist berhasil disimpan")
+                        else:
+                            self.show_toast("Gagal menyimpan playlist")
+            dlg.destroy()
+
+        dialog.connect("response", on_response)
+        dialog.show()
+
+    def _clear_playlist(self, _button=None):
+        self.playlist = []
+        self.playlist_index = -1
+        self._refresh_sidebar()
+        self.show_toast("Playlist dikosongkan")
+

@@ -219,7 +219,7 @@ class PlaybackMixin:
                     self._update_current_recent_position()
 
             current_spd = self.player.speed or 1.0
-            spd_text = f"{current_spd:.2f}x".rstrip("0").rstrip(".") + "x"
+            spd_text = format_speed(current_spd)
             if self.playback_opts_btn.get_label() != spd_text:
                 self.playback_opts_btn.set_label(spd_text)
 
@@ -253,14 +253,14 @@ class PlaybackMixin:
 
     def _set_speed(self, speed):
         self.player.speed = speed
-        self.playback_opts_btn.set_label(f"{speed:.2f}x".rstrip("0").rstrip(".") + "x")
+        self.playback_opts_btn.set_label(format_speed(speed))
         self.playback_opts_popover.popdown()
 
     def change_speed(self, delta):
         current = round(self.player.speed or 1.0, 2)
         new_speed = max(0.25, min(4.0, current + delta))
         self.player.speed = new_speed
-        self.playback_opts_btn.set_label(f"{new_speed:.2f}x".rstrip("0").rstrip(".") + "x")
+        self.playback_opts_btn.set_label(format_speed(new_speed))
 
     def toggle_ab_loop(self):
         if self._ab_state == 0:

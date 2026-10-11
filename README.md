@@ -47,6 +47,14 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
   Fitur pengulangan cuplikan bagian tertentu (Titik A ⟲ Titik B) dan kecepatan playback 0.25x hingga 4.0x.
 - **Visual Thumbnail Seekbar**:
   Hover timestamp dan thumbnail preview visual instan saat mengarahkan kursor di sepanjang seek bar.
+- **Dukungan mpv.conf & Custom GLSL Shaders (Opt-In)**:
+  - **Custom Shaders**: Peningkatan kualitas gambar dengan shader GLSL / mpv hooks (.hook, .glsl seperti Anime4K, FSRCNNX, CAS) yang dapat ditambahkan dan dikelola langsung dari tab Video Inspector.
+  - **mpv.conf Opt-in**: Pilihan untuk memuat konfigurasi `~/.config/mpv/mpv.conf` tanpa merusak prioritas pengaturan UI native INAA.
+- **Playlist M3U / M3U8 Lengkap**:
+  - Dukungan impor dan ekspor daftar putar format `.m3u` dan Extended M3U (`#EXTM3U`).
+  - Toolbar aksi cepat di sidebar (Buka Playlist, Simpan Playlist, Kosongkan) serta dukungan drag-and-drop file playlist langsung ke jendela.
+- **Editor Pintasan Keyboard Interaktif (Shortcut Editor UI - `Ctrl+,`)**:
+  - Dialog pengaturan grafis untuk mengubah tombol pintasan keyboard sesuai preferensi pengguna secara real-time, merekam tombol baru, dan mereset ke pengaturan bawaan.
 - **Sistem Plugin Ekstensi (ala IINA)**:
   Plugin berupa folder dengan `Info.json` + entry Python di `~/.config/inaa/plugins/`. Tidak dijalankan otomatis — harus diaktifkan lewat `enabled_plugins` di `config.json`. Plugin dieksekusi di sandbox AST (tanpa `import` / `eval` / `open`) dan hanya menerima API terbatas (toast, path, play/pause, seek).
 

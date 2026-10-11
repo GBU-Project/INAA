@@ -115,6 +115,9 @@ class PlayerWindow(
         self.volume_scale.set_value(saved_vol)
         self.player.volume = saved_vol
 
+        # Terapkan shader yang tersimpan
+        self._apply_saved_shaders()
+
         # Muat plugin pengguna (IINA-style: Info.json + explicit enable)
         self._load_plugins()
 

@@ -54,6 +54,87 @@ class FiltersMixin:
         except Exception:
             pass
 
+    def _apply_saved_shaders(self):
+        """Menerapkan shader yang tersimpan di config ke libmpv."""
+        shaders = self._config.get("custom_shaders", [])
+        valid_shaders = [s for s in shaders if os.path.isfile(s)]
+        try:
+            self.player["glsl-shaders"] = valid_shaders
+        except Exception:
+            pass
+
+    def _add_custom_shader(self, shader_path):
+        """Menambahkan shader GLSL ke mpv dan menyimpannya di config."""
+        if not os.path.isfile(shader_path):
+            self.show_toast("File shader tidak ditemukan")
+            return
+        current = list(self._config.get("custom_shaders", []))
+        if shader_path not in current:
+            current.append(shader_path)
+            self._config["custom_shaders"] = current
+            self._save_config_throttled(force=True)
+        try:
+            self.player["glsl-shaders"] = current
+            name = os.path.basename(shader_path)
+            self.show_toast(f"Shader aktif: {name}")
+        except Exception as e:
+            self.show_toast(f"Gagal memuat shader: {e}")
+        self._refresh_shader_ui()
+
+    def _clear_custom_shaders(self):
+        """Menghapus semua custom shader."""
+        self._config["custom_shaders"] = []
+        self._save_config_throttled(force=True)
+        try:
+            self.player["glsl-shaders"] = []
+            self.show_toast("Semua shader dinonaktifkan")
+        except Exception:
+            pass
+        self._refresh_shader_ui()
+
+    def _open_shader_chooser(self, _button):
+        """Dialog pemilih file shader .hook atau .glsl."""
+        dialog = Gtk.FileChooserDialog(
+            title="Pilih Custom GLSL Shader",
+            transient_for=self,
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        dialog.add_buttons(
+            "_Batal", Gtk.ResponseType.CANCEL,
+            "_Pilih", Gtk.ResponseType.OK,
+        )
+        f_filter = Gtk.FileFilter()
+        f_filter.set_name("GLSL / mpv Shaders (*.hook, *.glsl)")
+        f_filter.add_pattern("*.hook")
+        f_filter.add_pattern("*.glsl")
+        dialog.add_filter(f_filter)
+
+        all_filter = Gtk.FileFilter()
+        all_filter.set_name("Semua Berkas")
+        all_filter.add_pattern("*")
+        dialog.add_filter(all_filter)
+
+        def on_response(dlg, response):
+            if response == Gtk.ResponseType.OK:
+                gfile = dlg.get_file()
+                if gfile:
+                    path = gfile.get_path()
+                    if path:
+                        self._add_custom_shader(path)
+            dlg.destroy()
+
+        dialog.connect("response", on_response)
+        dialog.show()
+
+    def _refresh_shader_ui(self):
+        if hasattr(self, "insp_shader_status_label"):
+            shaders = self._config.get("custom_shaders", [])
+            if shaders:
+                names = ", ".join(os.path.basename(s) for s in shaders)
+                self.insp_shader_status_label.set_text(names)
+            else:
+                self.insp_shader_status_label.set_text("Tidak ada shader aktif")
+
     def _rebuild_filters_menu(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.set_margin_start(12)

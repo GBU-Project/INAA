@@ -87,7 +87,33 @@ class UIBuilderMixin:
 
         # Playlist sidebar (Kiri)
         self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.sidebar.set_size_request(220, -1)
+        self.sidebar.set_size_request(240, -1)
+        self.sidebar.add_css_class("iina-sidebar")
+
+        # Toolbar aksi playlist (Buka M3U, Simpan M3U, Hapus)
+        pl_toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        pl_toolbar.set_margin_start(6)
+        pl_toolbar.set_margin_end(6)
+        pl_toolbar.set_margin_top(6)
+        pl_toolbar.set_margin_bottom(6)
+
+        btn_open_m3u = Gtk.Button.new_from_icon_name("document-open-symbolic")
+        btn_open_m3u.set_tooltip_text("Buka Playlist (.m3u)")
+        btn_open_m3u.connect("clicked", self._open_m3u_dialog)
+        pl_toolbar.append(btn_open_m3u)
+
+        btn_save_m3u = Gtk.Button.new_from_icon_name("document-save-symbolic")
+        btn_save_m3u.set_tooltip_text("Simpan Playlist (.m3u)")
+        btn_save_m3u.connect("clicked", self._export_m3u_dialog)
+        pl_toolbar.append(btn_save_m3u)
+
+        btn_clear_pl = Gtk.Button.new_from_icon_name("edit-clear-all-symbolic")
+        btn_clear_pl.set_tooltip_text("Kosongkan Playlist")
+        btn_clear_pl.connect("clicked", self._clear_playlist)
+        pl_toolbar.append(btn_clear_pl)
+
+        self.sidebar.append(pl_toolbar)
+
         self.sidebar_list = Gtk.ListBox()
         self.sidebar_list.connect("row-activated", self.on_playlist_row_activated)
         sidebar_scroll = Gtk.ScrolledWindow()
@@ -110,7 +136,8 @@ class UIBuilderMixin:
         self.display_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
 
         # Page 1: Video GLArea
-        self.gl_area = MpvGLArea()
+        use_mpv_conf = bool(self._config.get("use_mpv_conf", False))
+        self.gl_area = MpvGLArea(use_mpv_conf=use_mpv_conf)
         self.gl_area.set_hexpand(True)
         self.gl_area.set_vexpand(True)
 
@@ -539,7 +566,7 @@ class UIBuilderMixin:
         def on_spd_changed(s):
             val = round(s.get_value(), 2)
             self._set_speed(val)
-            self.insp_spd_label.set_text(f"{val:.2f}x".rstrip("0").rstrip(".") + "x")
+            self.insp_spd_label.set_text(format_speed(val))
         self.insp_spd_scale.connect("value-changed", on_spd_changed)
         spd_row.append(self.insp_spd_scale)
         spd_row.append(self.insp_spd_label)
@@ -574,6 +601,61 @@ class UIBuilderMixin:
             adj_row.append(sc_lbl)
             adj_row.append(sc)
             box.append(adj_row)
+
+        # Custom GLSL Shaders
+        lbl_sh = Gtk.Label(label="GLSL Shaders & Peningkatan Gambar:")
+        lbl_sh.set_xalign(0)
+        lbl_sh.add_css_class("iina-sec-title")
+        box.append(lbl_sh)
+
+        self.insp_shader_status_label = Gtk.Label(label="Tidak ada shader aktif")
+        self.insp_shader_status_label.set_xalign(0)
+        self.insp_shader_status_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        self.insp_shader_status_label.add_css_class("dim-label")
+        box.append(self.insp_shader_status_label)
+
+        sh_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        btn_add_sh = Gtk.Button(label="Tambah Shader (.glsl/.hook)...")
+        btn_add_sh.add_css_class("iina-seg-btn")
+        btn_add_sh.connect("clicked", self._open_shader_chooser)
+        sh_btn_box.append(btn_add_sh)
+
+        btn_clr_sh = Gtk.Button(label="Bersihkan")
+        btn_clr_sh.add_css_class("iina-seg-btn")
+        btn_clr_sh.connect("clicked", lambda *_: self._clear_custom_shaders())
+        sh_btn_box.append(btn_clr_sh)
+        box.append(sh_btn_box)
+
+        # mpv.conf integration toggle (Opt-in)
+        lbl_conf = Gtk.Label(label="Konfigurasi Lanjutan mpv:")
+        lbl_conf.set_xalign(0)
+        lbl_conf.add_css_class("iina-sec-title")
+        box.append(lbl_conf)
+
+        self.mpv_conf_chk = Gtk.CheckButton(label="Gunakan ~/.config/mpv/mpv.conf (Butuh restart)")
+        self.mpv_conf_chk.set_active(bool(self._config.get("use_mpv_conf", False)))
+        def on_mpv_conf_toggled(chk):
+            is_act = chk.get_active()
+            self._config["use_mpv_conf"] = is_act
+            self._save_config_throttled(force=True)
+            msg = "mpv.conf diaktifkan (berlaku saat aplikasi dibuka ulang)" if is_act else "mpv.conf dinonaktifkan"
+            self.show_toast(msg)
+        self.mpv_conf_chk.connect("toggled", on_mpv_conf_toggled)
+        box.append(self.mpv_conf_chk)
+
+        # Pintasan Keyboard Editor Button
+        lbl_sc = Gtk.Label(label="Pintasan Keyboard:")
+        lbl_sc.set_xalign(0)
+        lbl_sc.add_css_class("iina-sec-title")
+        box.append(lbl_sc)
+
+        btn_shortcuts = Gtk.Button(label="Sunting Pintasan Keyboard (Ctrl+,)")
+        btn_shortcuts.add_css_class("iina-seg-btn")
+        btn_shortcuts.connect("clicked", lambda *_: self.open_shortcuts_editor())
+        box.append(btn_shortcuts)
+
+        # Inisialisasi tampilan status shader
+        self._refresh_shader_ui()
 
         return box
 
