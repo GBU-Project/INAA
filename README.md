@@ -10,8 +10,8 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
 
 - **Halaman Sambutan (Welcome Screen ala macOS IINA)**:
   Tampilan awal *dark glassmorphism* saat belum ada media yang dibuka. Dilengkapi tombol aksi cepat (*Buka File*, *Buka URL/Stream*, seret & lepas berkas), serta daftar *Terakhir Diputar* yang dapat diklik langsung untuk melanjutkan tontonan.
-- **Floating OSD & Kontrol Melayang**:
-  Panel kontrol melayang berdesain *frosted glass* yang otomatis tersembunyi (*auto-hide*) saat video berjalan dan muncul kembali saat mouse digerakkan.
+- **Floating OSD, Auto-hide Header & Kontrol Melayang**:
+  Panel kontrol *frosted glass* dan headerbar otomatis tersembunyi saat video berjalan, lalu muncul kembali saat mouse digerakkan (dapat diatur di Pengaturan).
 - **Sidebar Inspector Pengaturan Lengkap (`i`)**:
   Panel kanan dengan 3 tab:
   - **Video**: Hardware Acceleration switcher (Auto, VA-API, NVDEC, Off), aspect ratio, **Video Crop / Black Bar Removal** (16:9, 4:3, 2.35:1, 21:9), rotasi video, deinterlace, filter kecerahan, kontras, saturasi, dan gamma real-time.
@@ -30,11 +30,11 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
   Mengingat detik posisi tontonan terakhir per file dan langsung melanjutkan pemutaran disertai notifikasi toast status.
 - **Playlist Cerdas & Smart Next Episode (Auto-Advance)**:
   - **Smart Folder Discovery**: Saat memutar salah satu file di folder, INAA secara otomatis mendeteksi episode/file media lainnya di direktori yang sama dan menyusunnya rapi ke dalam playlist.
-  - Daftar putar dengan sidebar geser, auto-advance ke trek berikutnya saat lagu/video selesai, dan pemutaran berkelanjutan tanpa henti.
+  - Daftar putar dengan sidebar geser, **ulang semua / ulang satu / acak**, auto-advance ke trek berikutnya, dan pemutaran berkelanjutan.
 - **Music Mode (Tampilan Musik Khusus)**:
   Beralih otomatis ke antarmuka musik khusus saat memutar file audio, menampilkan visual cover art, judul lagu, dan artis.
 - **Picture-in-Picture & Mode Mengambang (`d`)**:
-  Mode **Mini Player** yang ringkas dan selalu terlihat — jendela yang sama mengecil dan menyembunyikan chrome, memberi efek video "mengambang". Bisa dipicu lewat tombol Mini Player, shortcut `d`, atau menyeret video ke luar.
+  Mode **Mini Player** yang ringkas, selalu di atas, dan selalu terlihat — jendela yang sama mengecil dan menyembunyikan chrome. Bisa dipicu lewat tombol Mini Player, shortcut `d`, atau menyeret video ke luar.
 
   > **Catatan teknis**: versi awal fitur "Detach" mencoba memindahkan video ke `Gtk.Window` terpisah yang sungguhan. Setelah diuji, ternyata `vo=libmpv` (render API mpv yang dipakai INAA) tidak bisa bertahan begitu render context-nya dibongkar untuk reparenting — mpv langsung meng-unload media yang sedang diputar, bahkan sempat menyebabkan crash total (segfault) sebelum diperbaiki. Karena itu "Detach" sekarang memakai mekanisme Mini Player yang sama (window yang sama diperkecil, bukan window baru sungguhan) — terbukti aman lewat pengujian playback berkelanjutan tanpa jeda.
 - **Cuplikan Layar / Screenshot (`s`)**:
@@ -53,8 +53,8 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
 - **Playlist M3U / M3U8 Lengkap**:
   - Dukungan impor dan ekspor daftar putar format `.m3u` dan Extended M3U (`#EXTM3U`).
   - Toolbar aksi cepat di sidebar (Buka Playlist, Simpan Playlist, Kosongkan) serta dukungan drag-and-drop file playlist langsung ke jendela.
-- **Editor Pintasan Keyboard Interaktif (Shortcut Editor UI - `Ctrl+,`)**:
-  - Dialog pengaturan grafis untuk mengubah tombol pintasan keyboard sesuai preferensi pengguna secara real-time, merekam tombol baru, dan mereset ke pengaturan bawaan.
+- **Pengaturan (`Ctrl+P`) & Editor Pintasan (`Ctrl+,`)**:
+  - Jendela Preferences: auto-hide chrome, sesuaikan jendela ke rasio video, resume playback, mini player always-on-top, delay OSD, mode ulang/acak, dan pintasan.
 - **Sistem Plugin Ekstensi (ala IINA)**:
   Plugin berupa folder dengan `Info.json` + entry Python di `~/.config/inaa/plugins/`. Tidak dijalankan otomatis — harus diaktifkan lewat `enabled_plugins` di `config.json`. Plugin dieksekusi di sandbox AST (tanpa `import` / `eval` / `open`) dan hanya menerima API terbatas (toast, path, play/pause, seek).
 
@@ -76,6 +76,8 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
 | `\` atau `Backspace` | Reset kecepatan pemutaran ke normal (1.0x) |
 | `l` | Langkah A-B Loop (Set Titik A → Set Titik B → Hapus Loop) |
 | `Page Up` / `Page Down` | Bab / Chapter Sebelumnya / Berikutnya |
+| `Ctrl+P` | Buka jendela Pengaturan |
+| `Ctrl+,` | Sunting pintasan keyboard |
 | `Esc` | Keluar dari Fullscreen atau keluar dari mode Mini Player |
 | *Klik Kiri Video* | Putar / Jeda |
 | *Klik Ganda Video* | Layar Penuh (atau restore dari Mini Player) |
@@ -163,7 +165,9 @@ INAA/
 │   ├── filters_mixin.py  # Video equalizer, crop, & audio filter
 │   ├── input_mixin.py    # Gesture, scroll seek, & keyboard shortcuts
 │   ├── window_mixin.py   # Mini player, PiP, toast, & screenshot
+│   ├── prefs_mixin.py    # Jendela Pengaturan (Ctrl+P)
 │   └── common.py         # Config, shared helper, styling & GL proc loader
+├── playlist_nav.py    # Logika next/loop/shuffle playlist
 ├── mpris.py           # Integrasi MPRIS2 Linux (D-Bus session bus)
 ├── media_uri.py       # Validasi URI file/http/https
 ├── plugin_loader.py   # Loader plugin Info.json (opt-in, API terbatas)
@@ -217,7 +221,7 @@ segera dicek.
 ## Konfigurasi & Penyimpanan
 
 Pengaturan pengguna tersimpan otomatis di:
-- **Konfigurasi & Riwayat**: `~/.config/inaa/config.json` (volume, ukuran jendela, daftar putar terakhir, posisi timestamp tontonan, `enabled_plugins`).
+- **Konfigurasi & Riwayat**: `~/.config/inaa/config.json` (volume, ukuran jendela, riwayat, loop/shuffle, auto-hide, `enabled_plugins`).
 - **Direktori Plugin**: `~/.config/inaa/plugins/<id>/` berisi `Info.json` dan berkas entry. Contoh:
 
 ```json

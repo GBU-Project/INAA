@@ -80,7 +80,7 @@ class WindowMixin:
             return
         if not self._is_mini:
             self.mini_btn.set_active(True)  # akan memicu on_mini_toggled
-        self.show_toast("Mode mengambang aktif (video tetap di window yang sama)")
+        self.show_toast("Mini player aktif (selalu di atas)")
 
     def attach_video_window(self):
         if self._is_mini:
@@ -153,6 +153,30 @@ class WindowMixin:
             self.on_playpause_clicked(None)
         btn_play.connect("clicked", toggle_play_action)
         box.append(btn_play)
+
+        btn_loop = Gtk.Button(label={"off": "Ulangi: Mati", "all": "Ulangi: Semua", "one": "Ulangi: Satu"}.get(self._loop_mode, "Ulangi"))
+        btn_loop.set_icon_name("media-playlist-repeat-symbolic")
+        def loop_action(_):
+            self.video_context_popover.popdown()
+            self.cycle_loop_mode()
+        btn_loop.connect("clicked", loop_action)
+        box.append(btn_loop)
+
+        btn_shuffle = Gtk.Button(label="Acak: Aktif" if self._shuffle else "Acak: Mati")
+        btn_shuffle.set_icon_name("media-playlist-shuffle-symbolic")
+        def shuffle_action(_):
+            self.video_context_popover.popdown()
+            self._set_shuffle(not self._shuffle, from_ui=True)
+        btn_shuffle.connect("clicked", shuffle_action)
+        box.append(btn_shuffle)
+
+        btn_prefs = Gtk.Button(label="Pengaturan (Ctrl+P)")
+        btn_prefs.set_icon_name("preferences-system-symbolic")
+        def prefs_action(_):
+            self.video_context_popover.popdown()
+            self.open_preferences()
+        btn_prefs.connect("clicked", prefs_action)
+        box.append(btn_prefs)
 
         # Bisu / Suara
         is_muted = self.player.mute

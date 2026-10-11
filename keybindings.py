@@ -19,6 +19,7 @@ DEFAULT_SHORTCUTS = {
     "open_url": "Ctrl+l",
     "history": "Ctrl+h",
     "edit_shortcuts": "Ctrl+comma",
+    "preferences": "Ctrl+p",
 }
 
 SHORTCUT_LABELS = {
@@ -42,6 +43,7 @@ SHORTCUT_LABELS = {
     "open_url": "Buka URL",
     "history": "Riwayat pemutaran",
     "edit_shortcuts": "Sunting pintasan",
+    "preferences": "Pengaturan",
 }
 
 _MODIFIER_KEYS = {

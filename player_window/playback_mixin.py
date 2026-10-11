@@ -21,7 +21,7 @@ class PlaybackMixin:
         self._current_path = path
 
         # Jika resume_pos tidak diberikan secara eksplisit, cari riwayat posisi terakhir dari config
-        if resume_pos is None:
+        if resume_pos is None and self._config.get("resume_playback", True):
             recents = self._config.get("recent_files", [])
             for item in recents:
                 if item.get("path") == path:
@@ -63,8 +63,8 @@ class PlaybackMixin:
         self._thumb_cache.clear()
         self._thumb_pending.clear()
 
-        # Tampilkan OSD saat media dibuka
-        self.osd_box.set_visible(True)
+        self._window_fitted_for = None
+        self._reveal_chrome()
 
         # Update trek, metadata musik, & chapter setelah media dimuat
         GLib.timeout_add(600, self._on_media_loaded)
@@ -159,6 +159,8 @@ class PlaybackMixin:
     def on_playpause_clicked(self, button):
         self.player.pause = not self.player.pause
         self._update_playpause_icon()
+        if self.player.pause:
+            self._reveal_chrome()
 
     def on_volume_changed(self, scale):
         vol = scale.get_value()
@@ -177,18 +179,45 @@ class PlaybackMixin:
     def on_fullscreen_clicked(self, button):
         if self.is_fullscreen():
             self.unfullscreen()
+            if not self._is_mini:
+                self.header.set_visible(True)
         else:
             self.fullscreen()
+            self.header.set_visible(False)
 
     def on_mini_toggled(self, button):
         self._is_mini = button.get_active()
         if self._is_mini:
             self._normal_size = (self.get_width(), self.get_height())
             self.header.set_visible(False)
+            self.sidebar.set_visible(False)
+            self.inspector_panel.set_visible(False)
             self.set_default_size(360, 220)
+            self._set_always_on_top(bool(self._config.get("keep_above_mini", True)))
+            self.osd_box.set_visible(True)
+            self.osd_box.remove_css_class("hidden")
         else:
             self.header.set_visible(True)
             self.set_default_size(*self._normal_size)
+            self._set_always_on_top(False)
+            if self.playlist_toggle.get_active():
+                self.sidebar.set_visible(True)
+            if self.inspector_btn.get_active():
+                self.inspector_panel.set_visible(True)
+
+    def _set_always_on_top(self, enabled):
+        try:
+            native = self.get_native()
+            surface = native.get_surface() if native else None
+            if surface is not None and hasattr(surface, "set_keep_above"):
+                surface.set_keep_above(bool(enabled))
+                return
+        except Exception:
+            pass
+        try:
+            self.set_keep_above(bool(enabled))
+        except Exception:
+            pass
 
     def _update_playpause_icon(self):
         icon_name = "media-playback-pause-symbolic" if not self.player.pause else "media-playback-start-symbolic"
@@ -230,6 +259,9 @@ class PlaybackMixin:
             if pos > 0.5:
                 self._has_played_media = True
 
+            if duration > 0 and self._window_fitted_for != self._current_path:
+                self._fit_window_to_video()
+
             # Auto-advance ke trek berikutnya di playlist saat lagu/video selesai
             if self._has_played_media and self._current_path:
                 current_mpv_path = None
@@ -238,15 +270,18 @@ class PlaybackMixin:
                 except Exception:
                     pass
 
-                # Kondisi selesai: mpv sudah selesai memuat file (path jadi None/idle),
-                # atau pos sudah mencapai durasi akhir (selisih < 0.35s)
                 is_finished = (current_mpv_path is None) or (duration > 0 and pos >= duration - 0.35)
                 if is_finished:
                     self._has_played_media = False
-                    # Jika ada trek berikutnya di playlist, putar otomatis
-                    if self.playlist and self.playlist_index + 1 < len(self.playlist):
-                        next_path = self.playlist[self.playlist_index + 1]
-                        GLib.idle_add(lambda: self.open_file(next_path))
+                    nxt = auto_advance_index(
+                        self.playlist_index,
+                        len(self.playlist),
+                        self._loop_mode,
+                        self._shuffle,
+                    )
+                    if nxt is not None:
+                        next_path = self.playlist[nxt]
+                        GLib.idle_add(lambda p=next_path: self.open_file(p))
         except Exception:
             pass
         return True
@@ -278,6 +313,38 @@ class PlaybackMixin:
         else:
             self._reset_ab_loop()
         self.playback_opts_popover.popdown()
+
+    def _fit_window_to_video(self):
+        if not self._config.get("fit_window", True):
+            return
+        if self._is_mini or self.is_fullscreen() or self._is_music_mode:
+            return
+        try:
+            w = int(self.player.width or 0)
+            h = int(self.player.height or 0)
+        except Exception:
+            return
+        if w <= 0 or h <= 0:
+            return
+        self._window_fitted_for = self._current_path
+        try:
+            display = self.get_display()
+            monitor = display.get_monitor_at_surface(self.get_native().get_surface()) if display else None
+            geo = monitor.get_geometry() if monitor else None
+            max_w = int((geo.width if geo else 1600) * 0.85)
+            max_h = int((geo.height if geo else 900) * 0.85)
+        except Exception:
+            max_w, max_h = 1600, 900
+        chrome_h = 48 if self.header.get_visible() else 0
+        extra_w = 0
+        if self.sidebar.get_visible():
+            extra_w += 240
+        if self.inspector_panel.get_visible():
+            extra_w += 280
+        scale = min(max_w / max(w + extra_w, 1), max_h / max(h + chrome_h, 1), 1.0)
+        target_w = max(480, int(w * scale) + extra_w)
+        target_h = max(270, int(h * scale) + chrome_h)
+        self.set_default_size(target_w, target_h)
 
     def _reset_ab_loop(self):
         try:

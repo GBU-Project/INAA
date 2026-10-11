@@ -43,6 +43,7 @@ from opensubtitles import download_subtitle, search_subtitles
 from fmt import format_speed
 from m3u_parser import export_m3u, parse_m3u
 from plugin_loader import load_plugins
+from playlist_nav import auto_advance_index, cycle_loop_mode, loop_status_mpris, next_playlist_index
 
 # mpv internal parser & shader compiler requires LC_NUMERIC="C"
 try:
@@ -102,6 +103,12 @@ _IINA_CSS = b"""
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
     padding: 10px 16px 12px 16px;
     margin-bottom: 24px;
+    opacity: 1;
+    transition: opacity 220ms ease-in-out;
+}
+
+.iina-osd-panel.hidden {
+    opacity: 0;
 }
 
 .iina-osd-panel button {
@@ -253,6 +260,13 @@ def _load_config():
                 data.setdefault("shortcuts", {})
                 data.setdefault("use_mpv_conf", False)
                 data.setdefault("custom_shaders", [])
+                data.setdefault("auto_hide_chrome", True)
+                data.setdefault("fit_window", True)
+                data.setdefault("resume_playback", True)
+                data.setdefault("keep_above_mini", True)
+                data.setdefault("osd_hide_ms", 3000)
+                data.setdefault("loop_mode", "off")
+                data.setdefault("shuffle", False)
                 try:
                     CONFIG_DIR.chmod(0o700)
                     CONFIG_FILE.chmod(0o600)
@@ -270,6 +284,13 @@ def _load_config():
         "shortcuts": {},
         "use_mpv_conf": False,
         "custom_shaders": [],
+        "auto_hide_chrome": True,
+        "fit_window": True,
+        "resume_playback": True,
+        "keep_above_mini": True,
+        "osd_hide_ms": 3000,
+        "loop_mode": "off",
+        "shuffle": False,
     }
 
 

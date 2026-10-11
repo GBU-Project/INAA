@@ -228,11 +228,15 @@ class MprisPlayer:
 
     @property
     def LoopStatus(self):
-        return "None"
+        from playlist_nav import loop_status_mpris
+        return loop_status_mpris(getattr(self._win, "_loop_mode", "off"))
 
     @LoopStatus.setter
     def LoopStatus(self, value):
-        pass  # INAA belum punya mode loop playlist; diam-diam diabaikan.
+        mapping = {"None": "off", "Track": "one", "Playlist": "all"}
+        mode = mapping.get(value)
+        if mode:
+            self._win._set_loop_mode(mode)
 
     @property
     def Rate(self):
@@ -250,11 +254,11 @@ class MprisPlayer:
 
     @property
     def Shuffle(self):
-        return False
+        return bool(getattr(self._win, "_shuffle", False))
 
     @Shuffle.setter
     def Shuffle(self, value):
-        pass
+        self._win._set_shuffle(bool(value))
 
     @property
     def Metadata(self):

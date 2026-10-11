@@ -82,6 +82,11 @@ class UIBuilderMixin:
         self.mini_btn.connect("toggled", self.on_mini_toggled)
         self.header.pack_end(self.mini_btn)
 
+        prefs_btn = Gtk.Button.new_from_icon_name("preferences-system-symbolic")
+        prefs_btn.set_tooltip_text("Pengaturan (Ctrl+P)")
+        prefs_btn.connect("clicked", self.open_preferences)
+        self.header.pack_end(prefs_btn)
+
         root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.set_child(root)
 
@@ -111,6 +116,22 @@ class UIBuilderMixin:
         btn_clear_pl.set_tooltip_text("Kosongkan Playlist")
         btn_clear_pl.connect("clicked", self._clear_playlist)
         pl_toolbar.append(btn_clear_pl)
+
+        spacer_pl = Gtk.Box()
+        spacer_pl.set_hexpand(True)
+        pl_toolbar.append(spacer_pl)
+
+        self.shuffle_btn = Gtk.ToggleButton()
+        self.shuffle_btn.set_icon_name("media-playlist-shuffle-symbolic")
+        self.shuffle_btn.set_tooltip_text("Acak playlist")
+        self.shuffle_btn.set_active(self._shuffle)
+        self.shuffle_btn.connect("toggled", lambda b: self._set_shuffle(b.get_active(), from_ui=True))
+        pl_toolbar.append(self.shuffle_btn)
+
+        self.loop_btn = Gtk.Button()
+        self.loop_btn.connect("clicked", lambda *_: self.cycle_loop_mode())
+        pl_toolbar.append(self.loop_btn)
+        self._update_loop_button()
 
         self.sidebar.append(pl_toolbar)
 
@@ -256,6 +277,20 @@ class UIBuilderMixin:
         self.next_btn.set_tooltip_text("File Berikutnya")
         self.next_btn.connect("clicked", lambda *_: self.play_relative(1))
         btn_row.append(self.next_btn)
+
+        self.osd_shuffle_btn = Gtk.ToggleButton()
+        self.osd_shuffle_btn.set_icon_name("media-playlist-shuffle-symbolic")
+        self.osd_shuffle_btn.set_tooltip_text("Acak playlist")
+        self.osd_shuffle_btn.set_has_frame(False)
+        self.osd_shuffle_btn.set_active(self._shuffle)
+        self.osd_shuffle_btn.connect("toggled", lambda b: self._set_shuffle(b.get_active(), from_ui=True))
+        btn_row.append(self.osd_shuffle_btn)
+
+        self.osd_loop_btn = Gtk.Button()
+        self.osd_loop_btn.set_has_frame(False)
+        self.osd_loop_btn.connect("clicked", lambda *_: self.cycle_loop_mode())
+        btn_row.append(self.osd_loop_btn)
+        self._update_loop_button()
 
         spacer_right = Gtk.Box()
         spacer_right.set_hexpand(True)
@@ -875,9 +910,10 @@ class UIBuilderMixin:
 
     def _connect_signals(self):
         # Motion controller untuk mendeteksi pergerakan kursor dan auto-hide OSD
-        video_motion = Gtk.EventControllerMotion()
-        video_motion.connect("motion", self._on_video_motion)
-        self.video_overlay.add_controller(video_motion)
+        chrome_motion = Gtk.EventControllerMotion()
+        chrome_motion.connect("motion", self._on_video_motion)
+        chrome_motion.connect("leave", self._on_video_leave)
+        self.add_controller(chrome_motion)
 
         # Gunakan gesture drag untuk mendeteksi saat slider mulai ditarik dan dilepas
         drag = Gtk.GestureDrag()

@@ -126,6 +126,7 @@ class InputMixin:
             "open_file": lambda: self.on_open_clicked(None),
             "open_url": lambda: self.on_open_url_clicked(None),
             "edit_shortcuts": lambda: self.open_shortcuts_editor(None),
+            "preferences": lambda: self.open_preferences(None),
         }
 
     def _toggle_inspector_shortcut(self):
@@ -148,23 +149,57 @@ class InputMixin:
         return True
 
     def _on_video_motion(self, controller, x, y):
-        # Tampilkan OSD saat kursor bergerak
-        if not self.osd_box.get_visible():
-            self.osd_box.set_visible(True)
-
+        self._reveal_chrome()
         if self._osd_hide_timeout_id:
             GLib.source_remove(self._osd_hide_timeout_id)
             self._osd_hide_timeout_id = None
+        if self._should_auto_hide_chrome():
+            delay = max(500, int(self._config.get("osd_hide_ms", 3000)))
+            self._osd_hide_timeout_id = GLib.timeout_add(delay, self._hide_osd_callback)
 
-        # Sembunyikan OSD jika video sedang play dan tidak sedang drag seekbar setelah 3 detik
-        if not self.player.pause and not self._seekbar_user_dragging and not self._is_mini:
-            self._osd_hide_timeout_id = GLib.timeout_add(3000, self._hide_osd_callback)
+    def _should_auto_hide_chrome(self):
+        if not self._config.get("auto_hide_chrome", True):
+            return False
+        if self._is_mini or self._is_music_mode:
+            return False
+        if self._seekbar_user_dragging:
+            return False
+        try:
+            if self.player.pause:
+                return False
+        except Exception:
+            return False
+        name = self.display_stack.get_visible_child_name()
+        return name == "video" and bool(self._current_path)
+
+    def _reveal_chrome(self):
+        self._chrome_visible = True
+        self.osd_box.set_visible(True)
+        self.osd_box.remove_css_class("hidden")
+        if not self._is_mini and not self.is_fullscreen():
+            self.header.set_visible(True)
 
     def _hide_osd_callback(self):
-        if not self.player.pause and not self._seekbar_user_dragging and not self._is_mini:
-            self.osd_box.set_visible(False)
+        if self._should_auto_hide_chrome():
+            self._chrome_visible = False
+            self.osd_box.add_css_class("hidden")
+            if not self._is_mini:
+                self.header.set_visible(False)
+            GLib.timeout_add(230, self._finish_hide_osd)
         self._osd_hide_timeout_id = None
         return False
+
+    def _finish_hide_osd(self):
+        if not self._chrome_visible and not self._is_mini:
+            self.osd_box.set_visible(False)
+        return False
+
+    def _on_video_leave(self, controller):
+        if self._osd_hide_timeout_id:
+            GLib.source_remove(self._osd_hide_timeout_id)
+            self._osd_hide_timeout_id = None
+        if self._should_auto_hide_chrome():
+            self._osd_hide_timeout_id = GLib.timeout_add(400, self._hide_osd_callback)
 
     def _on_seekbar_motion(self, controller, x, y):
         try:

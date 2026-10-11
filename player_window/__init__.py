@@ -49,9 +49,11 @@ from .subtitles_mixin import SubtitlesMixin
 from .filters_mixin import FiltersMixin
 from .input_mixin import InputMixin
 from .window_mixin import WindowMixin
+from .prefs_mixin import PrefsMixin
 
 
 class PlayerWindow(
+    PrefsMixin,
     WindowMixin,
     InputMixin,
     FiltersMixin,
@@ -93,6 +95,13 @@ class PlayerWindow(
         self._drag_start_pos = None
         self._has_played_media = False
         self._last_config_save = 0.0
+        self._loop_mode = self._config.get("loop_mode", "off")
+        if self._loop_mode not in ("off", "all", "one"):
+            self._loop_mode = "off"
+        self._shuffle = bool(self._config.get("shuffle", False))
+        self._updating_shuffle_ui = False
+        self._window_fitted_for = None
+        self._chrome_visible = True
 
         # Cache thumbnail seekbar
         self._thumb_cache = {}

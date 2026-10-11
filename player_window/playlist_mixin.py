@@ -171,9 +171,69 @@ class PlaylistMixin:
     def play_relative(self, delta):
         if not self.playlist:
             return
-        new_index = self.playlist_index + delta
-        if 0 <= new_index < len(self.playlist):
+        new_index = next_playlist_index(
+            self.playlist_index,
+            len(self.playlist),
+            delta,
+            self._loop_mode,
+            self._shuffle,
+        )
+        if new_index is not None:
             self.open_file(self.playlist[new_index])
+
+    def _set_loop_mode(self, mode):
+        if mode not in ("off", "all", "one"):
+            mode = "off"
+        self._loop_mode = mode
+        self._config["loop_mode"] = mode
+        self._save_config_throttled(force=True)
+        self._update_loop_button()
+        labels = {"off": "Ulangi: Mati", "all": "Ulangi: Semua", "one": "Ulangi: Satu"}
+        self.show_toast(labels[mode])
+
+    def cycle_loop_mode(self, _button=None):
+        self._set_loop_mode({"off": "all", "all": "one", "one": "off"}.get(self._loop_mode, "all"))
+
+    def _set_shuffle(self, enabled, from_ui=False):
+        enabled = bool(enabled)
+        if getattr(self, "_updating_shuffle_ui", False):
+            return
+        changed = self._shuffle != enabled
+        self._shuffle = enabled
+        self._config["shuffle"] = enabled
+        if changed:
+            self._save_config_throttled(force=True)
+        self._update_shuffle_buttons()
+        if from_ui and changed:
+            self.show_toast("Acak: Aktif" if enabled else "Acak: Mati")
+
+    def _update_shuffle_buttons(self):
+        self._updating_shuffle_ui = True
+        try:
+            for btn in (getattr(self, "shuffle_btn", None), getattr(self, "osd_shuffle_btn", None)):
+                if btn is not None and btn.get_active() != self._shuffle:
+                    btn.set_active(self._shuffle)
+        finally:
+            self._updating_shuffle_ui = False
+
+    def _update_loop_button(self):
+        icons = {
+            "off": "media-playlist-consecutive-symbolic",
+            "all": "media-playlist-repeat-symbolic",
+            "one": "media-playlist-repeat-song-symbolic",
+        }
+        tips = {
+            "off": "Ulangi: Mati (klik untuk Semua)",
+            "all": "Ulangi: Semua (klik untuk Satu)",
+            "one": "Ulangi: Satu trek (klik untuk Mati)",
+        }
+        icon = icons.get(self._loop_mode, icons["off"])
+        tip = tips.get(self._loop_mode, tips["off"])
+        for btn in (getattr(self, "loop_btn", None), getattr(self, "osd_loop_btn", None)):
+            if btn is None:
+                continue
+            btn.set_icon_name(icon)
+            btn.set_tooltip_text(tip)
 
     def _refresh_sidebar(self):
         child = self.sidebar_list.get_first_child()
