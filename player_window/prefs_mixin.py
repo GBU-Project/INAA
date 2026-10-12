@@ -318,14 +318,23 @@ class PrefsMixin:
         for val, name, desc in options:
             btn_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             btn_box.add_css_class("iina-pref-option-box")
-            if current_hw == val:
+            is_active = (current_hw == val)
+            if is_active:
                 btn_box.add_css_class("active")
 
             t_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             n_lbl = Gtk.Label(label=f"<b>{name}</b>")
             n_lbl.set_use_markup(True)
             n_lbl.set_xalign(0)
+            n_lbl.set_hexpand(True)
             t_box.append(n_lbl)
+
+            # Checkmark indicator
+            check_icon = Gtk.Image.new_from_icon_name("object-select-symbolic")
+            check_icon.add_css_class("iina-pref-check")
+            check_icon.set_visible(is_active)
+            t_box.append(check_icon)
+
             btn_box.append(t_box)
 
             d_lbl = Gtk.Label(label=desc)
@@ -336,17 +345,19 @@ class PrefsMixin:
 
             # Click gesture for selecting option
             click = Gtk.GestureClick()
-            def make_handler(target_val, box_ref):
+            def make_handler(target_val, box_ref, icon_ref):
                 def on_click(*_):
                     self._set_hwdec(target_val)
-                    for b in hw_buttons:
+                    for b, ico in hw_buttons:
                         b.remove_css_class("active")
+                        ico.set_visible(False)
                     box_ref.add_css_class("active")
+                    icon_ref.set_visible(True)
                 return on_click
 
-            click.connect("pressed", make_handler(val, btn_box))
+            click.connect("pressed", make_handler(val, btn_box, check_icon))
             btn_box.add_controller(click)
-            hw_buttons.append(btn_box)
+            hw_buttons.append((btn_box, check_icon))
             card1.append(btn_box)
 
         box.append(card1)

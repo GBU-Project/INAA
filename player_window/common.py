@@ -161,6 +161,125 @@ _IINA_CSS = b"""
     border-color: #007aff;
 }
 
+/* ========================================================
+   IINA 1.5.0 macOS Preferences / Settings Styling
+   ======================================================== */
+.iina-prefs-window {
+    background-color: #1e1e20;
+    color: #f5f5f7;
+}
+
+.iina-prefs-sidebar {
+    background-color: rgba(30, 30, 32, 0.98);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    min-width: 190px;
+    padding: 8px 6px;
+}
+
+.iina-prefs-sidebar searchbar,
+.iina-prefs-sidebar entry {
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #f5f5f7;
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+.iina-prefs-sidebar entry:focus {
+    border-color: #007aff;
+}
+
+.iina-prefs-cat-row {
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin: 2px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #e2e2e7;
+    transition: background-color 140ms ease;
+}
+
+.iina-prefs-cat-row:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.iina-prefs-cat-row:selected {
+    background: #007aff;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.iina-prefs-cat-row:selected image {
+    color: #ffffff;
+}
+
+.iina-prefs-content {
+    background-color: #161618;
+    padding: 16px 24px;
+}
+
+.iina-prefs-header-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+}
+
+.iina-prefs-section-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8e8e93;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Card Container (Apple HIG Grouped Card) */
+.iina-pref-card {
+    background-color: rgba(40, 40, 44, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+
+.iina-pref-card-row {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.iina-pref-card-row:last-child {
+    border-bottom: none;
+}
+
+.iina-pref-option-box {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-top: 5px;
+    transition: all 140ms ease;
+}
+
+.iina-pref-option-box:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.iina-pref-option-box.active {
+    border-color: #007aff;
+    background-color: rgba(0, 122, 255, 0.22);
+}
+
+.iina-pref-check {
+    color: #007aff;
+    font-size: 16px;
+    margin-left: 8px;
+}
+
 /* Welcome Screen (IINA Style) */
 .iina-welcome-screen {
     background-color: #121214;
