@@ -349,6 +349,22 @@ _IINA_CSS = b"""
     color: #f5f5f7;
 }
 
+/* ListBox mengecat latar sendiri (putih di tema terang) padahal teks kita terang:
+   buat transparan agar latar kartu/dialog yang gelap yang terlihat. */
+.iina-history-dialog list,
+.iina-history-dialog row,
+.iina-welcome-card list,
+.iina-welcome-card row {
+    background-color: transparent;
+    color: inherit;
+}
+
+.iina-history-dialog .dim-label,
+.iina-welcome-card .dim-label {
+    color: #a1a1a6;
+    opacity: 1;
+}
+
 .iina-history-row {
     background-color: transparent;
     border-radius: 8px;
@@ -458,6 +474,7 @@ def _load_config():
                 data.setdefault("audio_eq_gains", [0.0] * 10)
                 data.setdefault("audio_special_effect", "none")
                 data.setdefault("audio_custom_presets", {})
+                data.setdefault("audio_device", "auto")
                 sanitize_config(data)
                 try:
                     CONFIG_DIR.chmod(0o700)
@@ -487,6 +504,7 @@ def _load_config():
         "audio_eq_gains": [0.0] * 10,
         "audio_special_effect": "none",
         "audio_custom_presets": {},
+        "audio_device": "auto",
     }
 
 

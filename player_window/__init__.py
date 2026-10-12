@@ -50,10 +50,12 @@ from .filters_mixin import FiltersMixin
 from .input_mixin import InputMixin
 from .window_mixin import WindowMixin
 from .prefs_mixin import PrefsMixin
+from .audio_device_mixin import AudioDeviceMixin
 
 
 class PlayerWindow(
     PrefsMixin,
+    AudioDeviceMixin,
     WindowMixin,
     InputMixin,
     FiltersMixin,
@@ -126,6 +128,9 @@ class PlayerWindow(
 
         # Terapkan shader yang tersimpan
         self._apply_saved_shaders()
+
+        # Perangkat output audio tersimpan (hanya jika masih tersedia)
+        self._apply_saved_audio_device()
 
         # mpv.conf (hanya opsi aman, opt-in) dan script eksplisit
         self._apply_user_mpv_settings()

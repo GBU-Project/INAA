@@ -39,11 +39,23 @@ def _host_allowed(url):
     return host.endswith(".opensubtitles.org") or host.endswith(".opensubtitles.com")
 
 
+class _AllowlistRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Setiap lompatan redirect juga harus ke host yang diizinkan (urllib biasanya mengikuti ke mana saja)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _host_allowed(newurl):
+            raise ValueError("redirect ke host subtitle yang tidak diizinkan")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_AllowlistRedirectHandler)
+
+
 def _http_get(url, headers, timeout=8):
     if not _host_allowed(url):
         raise ValueError("host subtitle tidak diizinkan")
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _OPENER.open(req, timeout=timeout) as resp:
         chunks = []
         total = 0
         while True:
@@ -113,7 +125,7 @@ def download_subtitle(file_id, filename, api_key=None):
                 "Content-Type": "application/json",
             },
         )
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with _OPENER.open(req, timeout=8) as resp:
             info = json.loads(resp.read().decode("utf-8", errors="replace"))
         link = info.get("link")
         if not link:

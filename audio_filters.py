@@ -67,45 +67,47 @@ def clamp_gain(gain: float) -> float:
     return max(-12.0, min(12.0, round(val, 1)))
 
 
-def build_equalizer_filter(gains: List[float] | Tuple[float, ...]) -> str:
-    """Membangun string filter libavfilter equalizer aman dari 10 band gain."""
+def preamp_db(gains: List[float] | Tuple[float, ...]) -> float:
+    """Peredam volume (dB, <= 0) agar boost equalizer tidak membuat suara pecah (clipping).
+
+    Heuristik: sebesar gain positif tertinggi. Itu cukup untuk satu band; kalau band bertetangga
+    sama-sama dinaikkan, respons gabungannya bisa sedikit lebih tinggi dari gain masing-masing.
+    """
     if not gains:
-        return ""
-    filters = []
+        return 0.0
+    peak = max((clamp_gain(g) for g in list(gains)[: len(EQ_BANDS)]), default=0.0)
+    return -peak if peak >= 0.1 else 0.0
+
+
+def _eq_parts(gains: List[float] | Tuple[float, ...]) -> List[str]:
+    parts: List[str] = []
+    if not gains:
+        return parts
+    pre = preamp_db(gains)
+    if pre:
+        parts.append(f"volume=volume={pre:.1f}dB")
     for i, freq in enumerate(EQ_BANDS):
         g = clamp_gain(gains[i]) if i < len(gains) else 0.0
         if abs(g) >= 0.1:
-            freq_str = f"{freq:g}"
-            filters.append(f"equalizer=f={freq_str}:width_type=o:w=1:g={g:.1f}")
-    return ",".join(filters)
+            parts.append(f"equalizer=f={freq:g}:width_type=o:w=1:g={g:.1f}")
+    return parts
+
+
+def build_equalizer_filter(gains: List[float] | Tuple[float, ...]) -> str:
+    """Membangun string filter libavfilter equalizer aman dari 10 band gain (dengan preamp bila perlu)."""
+    return ",".join(_eq_parts(gains))
+
+
+def _effect_inner(effect_str: str) -> str:
+    if effect_str.startswith("lavfi=[") and effect_str.endswith("]"):
+        return effect_str[len("lavfi=["):-1]
+    return effect_str
 
 
 def compose_af_string(eq_gains: List[float] | Tuple[float, ...], special_effect: str = "none") -> str:
-    """Menggabungkan filter equalizer dan efek khusus yang divalidasi.
-    
-    Hindari mencampur filter `equalizer` sederhana dengan `lavfi=[...]` karena
-    mpv bisa gagal mem-parsing chain campuran. Gunakan lavfi graph tunggal
-    saat ada efek khusus.
-    """
-    eq_str = build_equalizer_filter(eq_gains)
+    """Menggabungkan equalizer (+ preamp) dan efek khusus yang divalidasi menjadi SATU graf lavfi."""
+    parts = _eq_parts(eq_gains)
     effect_str = SPECIAL_AUDIO_EFFECTS.get(special_effect, "")
-    
-    if not eq_str and not effect_str:
-        return ""
-    
-    # Jika ada efek khusus (lavfi), bungkus equalizer ke dalam lavfi graph
-    # untuk memastikan chain yang valid di mpv
-    if effect_str and eq_str:
-        # Extract lavfi content dari effect_str (format: "lavfi=[...]")
-        if effect_str.startswith("lavfi=["):
-            lavfi_content = effect_str[7:-1]  # Remove "lavfi=[" and "]"
-            # Combine: [equalizer chain],[lavfi content]
-            return f"lavfi=[{eq_str},{lavfi_content}]"
-    
-    # Fallback: just join with comma (works for equalizer-only or effect-only)
-    parts = []
-    if eq_str:
-        parts.append(eq_str)
     if effect_str:
-        parts.append(effect_str)
-    return ",".join(parts)
+        parts.append(_effect_inner(effect_str))
+    return f"lavfi=[{','.join(parts)}]" if parts else ""

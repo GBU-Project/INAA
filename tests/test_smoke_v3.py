@@ -90,4 +90,4 @@ def test_custom_preset_cannot_shadow_builtin(run):
 
 
 def test_combined_equalizer_and_loudnorm_is_accepted_by_real_mpv(run):
-    assert len(run["af"]) >= 2 and run["af"][-1] == "lavfi"
+    assert run["af"] == ["lavfi"]  # satu graf lavfi: equalizer + loudnorm

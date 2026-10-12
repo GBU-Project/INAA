@@ -420,6 +420,7 @@ class WindowMixin:
         dialog.set_default_size(620, 520)
 
         content = dialog.get_content_area()
+        dialog.add_css_class("iina-history-dialog")  # seluruh jendela, bukan hanya area isi
         content.add_css_class("iina-history-dialog")
         content.set_margin_start(16)
         content.set_margin_end(16)

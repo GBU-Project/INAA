@@ -66,7 +66,9 @@ INAA merender video langsung ke widget `Gtk.GLArea` via OpenGL Framebuffer Objec
 - **Pengaturan (`Ctrl+P`) & Editor Pintasan (`Ctrl+,`)**:
   - Jendela Preferences: auto-hide chrome, sesuaikan jendela ke rasio video, resume playback, mini player always-on-top, delay OSD, mode ulang/acak, dan pintasan.
 - **Sistem Plugin Ekstensi (ala IINA)**:
-  Plugin berupa folder dengan `Info.json` + entry Python di `~/.config/inaa/plugins/`. Tidak dijalankan otomatis — harus diaktifkan lewat `enabled_plugins` di `config.json`. Plugin dieksekusi di sandbox AST (tanpa `import` / `eval` / `open`) dan hanya menerima API terbatas (toast, path, play/pause, seek).
+  Plugin berupa folder dengan `Info.json` + entry Python di `~/.config/inaa/plugins/`. Tidak dijalankan otomatis — harus diaktifkan lewat `enabled_plugins` di `config.json`. Plugin hanya menerima API terbatas (toast, path, play/pause, seek) dan diperiksa lewat AST dengan **daftar putih** atribut (tanpa `import`/`eval`/`open`, tanpa atribut introspeksi seperti `gi_frame`/`f_builtins`).
+
+  > **Penting — ini pagar, bukan penjara.** Plugin tetap kode Python yang dijalankan di dalam proses INAA. Sandbox AST pernah berhasil ditembus lewat `generator.gi_frame.f_back.f_back.f_builtins` (kini ditutup dan diuji, lihat `tests/test_plugin_sandbox_v4.py`), dan teknik serupa bisa saja ditemukan lagi. Perlakukan mengaktifkan plugin sama seperti menjalankan programnya: **pasang hanya plugin dari sumber yang kamu percaya.** Isolasi yang sebenarnya membutuhkan proses terpisah dengan izin terbatas (belum ada).
 
 ---
 
@@ -251,4 +253,14 @@ URI yang diterima pemutar hanya berkas lokal, `file://`, `http://`, dan `https:/
 - Shader hanya satu jalur (`custom_shaders`) dan divalidasi (ekstensi, folder); `mpv_shaders` sudah dihapus.
 - Mengaktifkan `mpv.conf` langsung berlaku (opsi aman saja); mematikannya butuh restart.
 - Nama preset kustom tidak boleh sama dengan preset bawaan.
+
+## Perbaikan hasil audit
+- **Flatpak**: seluruh modul yang diimpor kini disalin ke paket (sebelumnya 6 modul hilang sehingga aplikasi gagal start), ffmpeg/mpv dipin ke commit, ffmpeg bisa menulis thumbnail JPEG (`mjpeg` + muxer `image2`), dan akses perangkat dipersempit ke `--device=dri`. `tests/test_flatpak_manifest.py` menjaga konsistensi ini.
+- **Playlist M3U**: dibatasi 5 MB / 5000 entri / 4096 karakter per baris agar playlist raksasa tidak membekukan jendela.
+- **Subtitle online**: setiap redirect juga harus ke host OpenSubtitles yang diizinkan.
+
+## Audio: peredam volume, perangkat output
+- **Preamp otomatis equalizer**: bila ada band yang dinaikkan, volume diturunkan sebesar gain tertinggi di awal rantai filter agar tidak pecah (clipping). Pada derau uji, preset `rock` dan `party` yang tadinya menyentuh 0,0 dB kini turun ke sekitar -1,1 dB. Ini heuristik: kalau band bertetangga sama-sama dinaikkan, respons gabungannya bisa sedikit lebih tinggi. Equalizer dan efek khusus selalu digabung menjadi satu graf `lavfi`.
+- **Perangkat output audio** (Inspector > Audio): pilih perangkat dari daftar yang dilaporkan mpv; tombol muat ulang untuk perangkat yang baru dicolok. mpv menerima nama perangkat apa saja tanpa error (lalu suara hilang), jadi INAA hanya mengizinkan nama dari daftar itu. Jika perangkat tersimpan sudah tidak ada, INAA memakai `auto` tanpa menghapus pilihanmu.
+- **Tampilan riwayat di tema terang**: daftar di dialog riwayat dan kartu "Terakhir Diputar" kini transparan di atas latar gelap, sehingga judul terbaca. File yang hilang juga ditandai dan tidak bisa diklik di halaman awal.
 

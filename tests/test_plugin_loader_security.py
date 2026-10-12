@@ -153,10 +153,11 @@ class TestSandboxEscapeRegressions:
                 "    api.show_toast(result)\n"
             ),
         )
+        # Sekarang `.format` tidak ada di daftar atribut yang diizinkan, jadi plugin ditolak
+        # sebelum dieksekusi (lebih kuat daripada sekadar "jalan buntu").
         window = _FakeWindow()
         loaded = load_plugins(window, plugins_dir, enabled_ids=["fmt_escape"])
-        assert len(loaded) == 1
-        assert window.toasts == ["not-callable"]
+        assert loaded == [] and window.toasts == []
 
     def test_generator_frame_introspection_does_not_leak_real_builtins(self, tmp_path):
         # gi_frame / f_builtins are not dunder-prefixed so the AST check
@@ -175,7 +176,9 @@ class TestSandboxEscapeRegressions:
                 "    api.show_toast(str('eval' in fb))\n"
             ),
         )
+        # `gi_frame` tidak ada di daftar atribut yang diizinkan -> ditolak sebelum dieksekusi.
+        # (Versi lama hanya membuktikan satu langkah rantai itu buntu; rantai f_back.f_back
+        # yang menembus keluar diuji di test_plugin_sandbox_v4.py.)
         window = _FakeWindow()
         loaded = load_plugins(window, plugins_dir, enabled_ids=["frame_escape"])
-        assert len(loaded) == 1
-        assert window.toasts == ["False"]
+        assert loaded == [] and window.toasts == []

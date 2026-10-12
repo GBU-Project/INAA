@@ -738,6 +738,9 @@ class UIBuilderMixin:
         self.insp_audio_track_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.append(self.insp_audio_track_box)
 
+        # Perangkat output audio (lihat audio_device_mixin.py)
+        box.append(self._build_audio_device_section())
+
         # Audio delay slider (-5s s/d +5s)
         lbl_delay = Gtk.Label(label="Audio Delay:")
         lbl_delay.set_xalign(0)

@@ -37,6 +37,20 @@ _PLUGIN_BUILTINS = {
 }
 
 
+# Daftar PUTIH atribut. Daftar nama terlarang saja tidak cukup: atribut seperti `gi_frame`, `f_back`,
+# `f_builtins`, `tb_frame`, `cr_frame` tidak berawalan "__" tetapi tetap bisa dipakai untuk
+# keluar dari sandbox (generator.gi_frame.f_back.f_back.f_builtins -> builtins asli).
+# `format`/`format_map` sengaja tidak diizinkan: mini-language "{0.__class__}" tidak terlihat di AST.
+_API_ATTRIBUTES = {"show_toast", "current_path", "play_pause", "seek_relative"}
+_SAFE_TYPE_METHODS = {
+    name
+    for tp in (str, list, dict, set, tuple, int, float, bool)
+    for name in dir(tp)
+    if not name.startswith("_")
+} - {"format", "format_map"}
+ALLOWED_ATTRIBUTES = frozenset(_API_ATTRIBUTES | _SAFE_TYPE_METHODS)
+
+
 class RestrictedPluginAPI:
     def __init__(self, window):
         def show_toast(message, duration_ms=2500):
@@ -91,6 +105,8 @@ def _assert_safe_plugin_ast(tree):
             raise ValueError("nama dunder tidak diizinkan")
         if isinstance(node, ast.Attribute) and node.attr.startswith(_DUNDER_PREFIX):
             raise ValueError("akses atribut dunder tidak diizinkan")
+        if isinstance(node, ast.Attribute) and node.attr not in ALLOWED_ATTRIBUTES:
+            raise ValueError(f"atribut tidak diizinkan: {node.attr}")
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id in _FORBIDDEN_NAMES:
                 raise ValueError(f"pemanggilan terlarang: {node.func.id}")

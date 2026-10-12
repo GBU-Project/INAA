@@ -3,6 +3,10 @@ import os
 from pathlib import Path
 from media_uri import is_allowed_media_uri, normalize_media_uri
 
+MAX_M3U_BYTES = 5 * 1024 * 1024   # playlist yang lebih besar hanya dibaca sebagian
+MAX_M3U_ENTRIES = 5000
+MAX_LINE_CHARS = 4096
+
 
 def parse_m3u(file_path):
     """Membaca berkas .m3u / .m3u8 dan mengembalikan daftar URI atau path valid.
@@ -16,9 +20,13 @@ def parse_m3u(file_path):
 
     try:
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            consumed = 0
             for line in f:
+                consumed += len(line)
+                if consumed > MAX_M3U_BYTES or len(entries) >= MAX_M3U_ENTRIES:
+                    break  # playlist buatan/raksasa tidak boleh membekukan aplikasi
                 line = line.strip()
-                if not line or line.startswith("#"):
+                if not line or line.startswith("#") or len(line) > MAX_LINE_CHARS:
                     continue
 
                 # Cek jika path lokal relatif

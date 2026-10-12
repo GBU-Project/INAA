@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import math
 
+from audio_devices import AUTO as _AUTO_DEVICE, is_valid_name as _valid_device
 from audio_filters import EQ_PRESETS, SPECIAL_AUDIO_EFFECTS, clamp_gain
 
 MAX_RECENT = 300
@@ -75,6 +76,9 @@ def sanitize_config(data):
                     and name.casefold() not in reserved and len(clean) < MAX_CUSTOM_PRESETS):
                 clean[name] = _gains(gains)
     data["audio_custom_presets"] = clean
+
+    device = data.get("audio_device")
+    data["audio_device"] = device if _valid_device(device) else _AUTO_DEVICE
 
     effect = data.get("audio_special_effect")
     data["audio_special_effect"] = effect if effect in SPECIAL_AUDIO_EFFECTS else "none"

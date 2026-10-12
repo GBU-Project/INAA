@@ -17,7 +17,7 @@
         "--socket=fallback-x11",
         "--socket=wayland",
         "--socket=pulseaudio",
-        "--device=all",
+        "--device=dri",
         "--filesystem=xdg-pictures",
         "--talk-name=org.gtk.vfs",
         "--talk-name=org.gtk.vfs.*",
@@ -85,11 +85,13 @@
                 "--disable-encoders",
                 "--disable-muxers",
                 "--enable-encoder=png",
+                "--enable-encoder=mjpeg",
+                "--enable-muxer=image2",
                 "--enable-libv4l2",
                 "--enable-libdav1d"
             ],
             "sources": [
-                { "type": "git", "url": "https://git.ffmpeg.org/ffmpeg.git" }
+                { "type": "git", "url": "https://git.ffmpeg.org/ffmpeg.git", "tag": "n6.1.1", "commit": "e38092ef9395d7049f871ef4d5411eb410e283e0" }
             ]
         },
         {
@@ -178,7 +180,7 @@
                 "-Dlibarchive=enabled"
             ],
             "sources": [
-                { "type": "git", "url": "https://github.com/mpv-player/mpv.git", "tag": "v0.38.0" }
+                { "type": "git", "url": "https://github.com/mpv-player/mpv.git", "tag": "v0.38.0", "commit": "02254b92dd237f03aa0a151c2a68778c4ea848f9" }
             ]
         },
 
@@ -221,7 +223,7 @@
             "buildsystem": "simple",
             "build-commands": [
                 "install -d /app/share/inaa",
-                "cp -r main.py player_window media_uri.py mpris.py opensubtitles.py plugin_loader.py keybindings.py logging_setup.py plugins /app/share/inaa/",
+                "cp -r main.py player_window plugins audio_devices.py audio_filters.py config_sanitize.py fmt.py keybindings.py logging_setup.py m3u_parser.py media_uri.py mpris.py mpv_user.py opensubtitles.py playlist_nav.py plugin_loader.py /app/share/inaa/",
 
                 "install -Dm755 flatpak/inaa-launcher /app/bin/inaa",
 

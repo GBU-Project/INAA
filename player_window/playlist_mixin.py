@@ -70,8 +70,16 @@ class PlaylistMixin:
             row.append(play_btn)
 
             # Gesture click to open and resume
-            gesture = Gtk.GestureClick()
-            gesture.connect("released", lambda _g, _n, _x, _y, p=path, resume_pos=pos: self.open_file(p, resume_pos=resume_pos))
+            missing = "://" not in path and not os.path.exists(path)
+            if missing:
+                row.set_opacity(0.55)
+                play_btn.set_sensitive(False)
+                s_lbl.set_text("File tidak ditemukan")
+                gesture = Gtk.GestureClick()
+                gesture.connect("released", lambda *_: self.show_toast("File tidak ditemukan"))
+            else:
+                gesture = Gtk.GestureClick()
+                gesture.connect("released", lambda _g, _n, _x, _y, p=path, resume_pos=pos: self.open_file(p, resume_pos=resume_pos))
             row.add_controller(gesture)
 
             self.recent_listbox.append(row)
