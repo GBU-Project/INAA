@@ -42,6 +42,7 @@ from media_uri import (
 )
 from opensubtitles import download_subtitle, search_subtitles
 from fmt import format_speed
+from config_sanitize import sanitize_config
 from m3u_parser import export_m3u, parse_m3u
 from plugin_loader import load_plugins
 from playlist_nav import auto_advance_index, cycle_loop_mode, loop_status_mpris, next_playlist_index
@@ -134,8 +135,10 @@ _IINA_CSS = b"""
 }
 
 .iina-inspector {
-    background-color: rgba(28, 28, 30, 0.94);
+    background-color: rgba(28, 28, 30, 0.96);
     border-left: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.35);
+    min-width: 320px;
 }
 
 .iina-sec-title {
@@ -150,6 +153,12 @@ _IINA_CSS = b"""
     border-radius: 6px;
     padding: 3px 8px;
     font-size: 11px;
+}
+
+.iina-seg-btn.iina-seg-active {
+    background: #007aff;
+    color: #ffffff;
+    border-color: #007aff;
 }
 
 /* Welcome Screen (IINA Style) */
@@ -216,11 +225,16 @@ _IINA_CSS = b"""
     color: #8e8e93;
 }
 
+.iina-history-dialog {
+    background-color: #1c1c1e;
+    color: #f5f5f7;
+}
+
 .iina-history-row {
     background-color: transparent;
     border-radius: 8px;
     padding: 8px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     transition: background-color 150ms ease;
 }
 
@@ -325,6 +339,7 @@ def _load_config():
                 data.setdefault("audio_eq_gains", [0.0] * 10)
                 data.setdefault("audio_special_effect", "none")
                 data.setdefault("audio_custom_presets", {})
+                sanitize_config(data)
                 try:
                     CONFIG_DIR.chmod(0o700)
                     CONFIG_FILE.chmod(0o600)

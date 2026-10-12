@@ -69,14 +69,30 @@ class FiltersMixin:
         if report.applied or report.rejected or report.scripts:
             GLib.timeout_add(1200, lambda: (self.show_toast(report.summary()), False)[1])
 
+    def _on_use_mpv_conf_changed(self, enabled):
+        """Terapkan mpv.conf segera saat dinyalakan; mematikan butuh restart (nilai lama tak bisa dipulihkan)."""
+        enabled = bool(enabled)
+        if self._config.get("use_mpv_conf") != enabled:
+            self._config["use_mpv_conf"] = enabled
+            self._save_config_throttled(force=True)
+        chk = getattr(self, "mpv_conf_chk", None)
+        if chk is not None and chk.get_active() != enabled:
+            chk.set_active(enabled)
+            return
+        if enabled:
+            self._apply_user_mpv_settings()
+        else:
+            self.show_toast("mpv.conf dimatikan (berlaku setelah aplikasi dibuka ulang)")
+
     def _apply_saved_shaders(self):
         """Menerapkan shader yang tersimpan di config ke libmpv."""
         shaders = self._config.get("custom_shaders", [])
-        valid_shaders = [s for s in shaders if os.path.isfile(s)]
-        try:
-            self.player["glsl-shaders"] = valid_shaders
-        except Exception:
-            pass
+        if not isinstance(shaders, list):
+            shaders = []
+        report = mpv_user.Report()
+        mpv_user.apply_shaders(self.player, shaders, SHADERS_DIR, report)
+        for source, reason in report.rejected:
+            logging.getLogger("inaa").warning("shader diabaikan: %s — %s", source, reason)
 
     def _add_custom_shader(self, shader_path):
         """Menambahkan shader GLSL ke mpv dan menyimpannya di config."""
@@ -322,6 +338,8 @@ class FiltersMixin:
 
     def _set_audio_eq_band(self, index, gain):
         """Mengubah gain band equalizer tertentu (-12 s/d +12 dB)."""
+        if getattr(self, "_is_syncing_eq_ui", False):
+            return
         gains = list(self._config.get("audio_eq_gains", [0.0] * 10))
         while len(gains) < 10:
             gains.append(0.0)
@@ -355,7 +373,12 @@ class FiltersMixin:
     def _save_custom_eq_preset(self, name):
         """Menyimpan gain equalizer saat ini ke preset kustom dengan nama yang diberikan."""
         name = name.strip()
-        if not name:
+        if not name or len(name) > 40:
+            return False
+        reserved = {n.casefold() for n in audio_filters.EQ_PRESETS} | {"custom"}
+        reserved |= {n.replace("_", " ").casefold() for n in audio_filters.EQ_PRESETS}
+        if name.casefold() in reserved:
+            self.show_toast(f"Nama '{name}' dipakai preset bawaan, pilih nama lain")
             return False
         custom_presets = self._config.get("audio_custom_presets", {})
         gains = [audio_filters.clamp_gain(g) for g in self._config.get("audio_eq_gains", [0.0] * 10)]
@@ -400,12 +423,16 @@ class FiltersMixin:
         """Sinkronkan posisi slider EQ di Inspector dengan nilai konfigurasi."""
         if not hasattr(self, "_eq_band_scales"):
             return
-        gains = self._config.get("audio_eq_gains", [0.0] * 10)
-        for i, scale in enumerate(self._eq_band_scales):
-            val = gains[i] if i < len(gains) else 0.0
-            scale.set_value(val)
-            if hasattr(self, "_eq_band_value_labels") and i < len(self._eq_band_value_labels):
-                self._eq_band_value_labels[i].set_text(f"{val:+.1f}dB" if val != 0 else "0dB")
+        self._is_syncing_eq_ui = True
+        try:
+            gains = self._config.get("audio_eq_gains", [0.0] * 10)
+            for i, scale in enumerate(self._eq_band_scales):
+                val = gains[i] if i < len(gains) else 0.0
+                scale.set_value(val)
+                if hasattr(self, "_eq_band_value_labels") and i < len(self._eq_band_value_labels):
+                    self._eq_band_value_labels[i].set_text(f"{val:+.1f}dB" if val != 0 else "0dB")
+        finally:
+            self._is_syncing_eq_ui = False
 
     def _set_audio_filter(self, preset):
         # Backward compatibility handler untuk UI popover / inspector lama

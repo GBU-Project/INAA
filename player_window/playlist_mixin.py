@@ -192,6 +192,7 @@ class PlaylistMixin:
         self._config["loop_mode"] = mode
         self._save_config_throttled(force=True)
         self._update_loop_button()
+        self._sync_prefs_loop_buttons()
         labels = {"off": "Ulangi: Mati", "all": "Ulangi: Semua", "one": "Ulangi: Satu"}
         self.show_toast(labels[mode])
 

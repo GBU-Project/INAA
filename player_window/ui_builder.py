@@ -517,7 +517,8 @@ class UIBuilderMixin:
 
     def _build_inspector_panel(self):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        panel.set_size_request(280, -1)
+        panel.set_size_request(320, -1)
+        panel.set_hexpand(False)
         panel.add_css_class("iina-inspector")
         panel.set_margin_start(0)
 
@@ -699,14 +700,10 @@ class UIBuilderMixin:
         lbl_conf.add_css_class("iina-sec-title")
         box.append(lbl_conf)
 
-        self.mpv_conf_chk = Gtk.CheckButton(label="Gunakan ~/.config/mpv/mpv.conf (opsi aman saja, butuh restart)")
+        self.mpv_conf_chk = Gtk.CheckButton(label="Gunakan ~/.config/mpv/mpv.conf (opsi aman saja)")
         self.mpv_conf_chk.set_active(bool(self._config.get("use_mpv_conf", False)))
         def on_mpv_conf_toggled(chk):
-            is_act = chk.get_active()
-            self._config["use_mpv_conf"] = is_act
-            self._save_config_throttled(force=True)
-            msg = "mpv.conf diaktifkan (berlaku saat aplikasi dibuka ulang)" if is_act else "mpv.conf dinonaktifkan"
-            self.show_toast(msg)
+            self._on_use_mpv_conf_changed(chk.get_active())
         self.mpv_conf_chk.connect("toggled", on_mpv_conf_toggled)
         box.append(self.mpv_conf_chk)
 

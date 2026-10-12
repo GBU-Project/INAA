@@ -420,6 +420,7 @@ class WindowMixin:
         dialog.set_default_size(620, 520)
 
         content = dialog.get_content_area()
+        content.add_css_class("iina-history-dialog")
         content.set_margin_start(16)
         content.set_margin_end(16)
         content.set_margin_top(12)
@@ -553,16 +554,35 @@ class WindowMixin:
                 play_btn = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
                 play_btn.set_tooltip_text("Putar dan lanjutkan")
                 play_btn.set_valign(Gtk.Align.CENTER)
-                def on_play_clicked(_b, p=path, resume_pos=pos):
-                    dialog.destroy()
-                    self.open_file(p, resume_pos=resume_pos)
-                play_btn.connect("clicked", on_play_clicked)
-                row.append(play_btn)
+                missing = "://" not in path and not os.path.exists(path)
+                opened = [False]  # cegah open_file ganda (tombol + klik baris)
 
-                # Gesture click row
-                gesture = Gtk.GestureClick()
-                gesture.connect("released", lambda _g, _n, _x, _y, p=path, resume_pos=pos: on_play_clicked(None, p, resume_pos))
-                row.add_controller(gesture)
+                def on_play_clicked(_b, p=path, resume_pos=pos, dur=dur, gone=missing):
+                    if opened[0]:
+                        return
+                    if gone:
+                        self.show_toast("File tidak ditemukan")
+                        return
+                    opened[0] = True
+                    dialog.destroy()
+                    # Hampir selesai ditonton -> mulai dari awal, bukan dari ujung.
+                    if resume_pos and dur and resume_pos >= dur - 5:
+                        resume_pos = 0
+                    self.open_file(p, resume_pos=resume_pos or None)
+
+                if missing:
+                    play_btn.set_sensitive(False)
+                    play_btn.set_tooltip_text("File tidak ditemukan")
+                    row.set_opacity(0.55)
+                    s_lbl.set_text("File tidak ditemukan • " + sub_txt)
+                else:
+                    play_btn.connect("clicked", on_play_clicked)
+                    # Klik pada baris (bukan tombol) juga memutar; tombol sendiri
+                    # sudah menangani kliknya, jadi gesture hanya di area info.
+                    gesture = Gtk.GestureClick()
+                    gesture.connect("released", lambda _g, _n, _x, _y: on_play_clicked(None))
+                    info_box.add_controller(gesture)
+                row.append(play_btn)
 
                 listbox.append(row)
 

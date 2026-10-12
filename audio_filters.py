@@ -81,13 +81,31 @@ def build_equalizer_filter(gains: List[float] | Tuple[float, ...]) -> str:
 
 
 def compose_af_string(eq_gains: List[float] | Tuple[float, ...], special_effect: str = "none") -> str:
-    """Menggabungkan filter equalizer dan efek khusus yang divalidasi."""
-    parts = []
+    """Menggabungkan filter equalizer dan efek khusus yang divalidasi.
+    
+    Hindari mencampur filter `equalizer` sederhana dengan `lavfi=[...]` karena
+    mpv bisa gagal mem-parsing chain campuran. Gunakan lavfi graph tunggal
+    saat ada efek khusus.
+    """
     eq_str = build_equalizer_filter(eq_gains)
+    effect_str = SPECIAL_AUDIO_EFFECTS.get(special_effect, "")
+    
+    if not eq_str and not effect_str:
+        return ""
+    
+    # Jika ada efek khusus (lavfi), bungkus equalizer ke dalam lavfi graph
+    # untuk memastikan chain yang valid di mpv
+    if effect_str and eq_str:
+        # Extract lavfi content dari effect_str (format: "lavfi=[...]")
+        if effect_str.startswith("lavfi=["):
+            lavfi_content = effect_str[7:-1]  # Remove "lavfi=[" and "]"
+            # Combine: [equalizer chain],[lavfi content]
+            return f"lavfi=[{eq_str},{lavfi_content}]"
+    
+    # Fallback: just join with comma (works for equalizer-only or effect-only)
+    parts = []
     if eq_str:
         parts.append(eq_str)
-
-    if special_effect in SPECIAL_AUDIO_EFFECTS and SPECIAL_AUDIO_EFFECTS[special_effect]:
-        parts.append(SPECIAL_AUDIO_EFFECTS[special_effect])
-
+    if effect_str:
+        parts.append(effect_str)
     return ",".join(parts)

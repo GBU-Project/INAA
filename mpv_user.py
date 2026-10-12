@@ -11,7 +11,7 @@ Kunci config.json (semua nonaktif secara default):
   "use_mpv_conf": true                                   # baca ~/.config/mpv/mpv.conf (hanya opsi aman)
   "mpv_conf":    "/path/lain/mpv.conf"                   # opsional: path mpv.conf alternatif
   "mpv_scripts": ["/home/aku/.config/mpv/scripts/x.lua"]  # wajib path absolut .lua/.js
-Shader tetap dikelola lewat "custom_shaders" (UI Inspector).
+Shader dikelola lewat "custom_shaders" (UI Inspector) dan dimuat via apply_shaders().
 
 PERINGATAN: script mpv (Lua/JS) berjalan dengan akses penuh ke akunmu (bisa menjalankan perintah),
 sama seperti plugin INAA. Hanya muat script dari sumber yang kamu percaya.
@@ -240,9 +240,6 @@ def apply_user_settings(player, config: dict, shaders_dir: Path) -> Report:
             apply_conf(player, conf, report)
         elif config.get("use_mpv_conf") is True:
             apply_conf(player, DEFAULT_MPV_CONF, report)
-        shaders = _as_list(config.get("mpv_shaders"))
-        if shaders:
-            apply_shaders(player, shaders, Path(shaders_dir), report)
         scripts = _as_list(config.get("mpv_scripts"))
         if scripts:
             apply_scripts(player, scripts, report)

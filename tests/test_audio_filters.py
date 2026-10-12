@@ -43,11 +43,12 @@ class TestAudioFilters(unittest.TestCase):
         af_night = audio_filters.compose_af_string([0.0] * 10, "nightmode")
         self.assertEqual(af_night, "lavfi=[loudnorm=I=-16:TP=-1.5:LRA=11]")
 
-        # Equalizer + nightmode
+        # Equalizer + nightmode -> sekarang dibungkus dalam satu lavfi graph
         bass_gains = audio_filters.EQ_PRESETS["bass_boost"]
         af_comb = audio_filters.compose_af_string(bass_gains, "nightmode")
         self.assertIn("equalizer=f=31.25", af_comb)
-        self.assertIn("lavfi=[loudnorm", af_comb)
+        self.assertIn("loudnorm=I=-16:TP=-1.5:LRA=11", af_comb)
+        self.assertTrue(af_comb.startswith("lavfi=["))
 
     def test_invalid_effect_rejected(self):
         # Efek tidak dikenal atau injeksi string berbahaya tidak boleh lolos

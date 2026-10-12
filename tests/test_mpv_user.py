@@ -213,11 +213,11 @@ def test_master_entry_applies_all_three_and_summarises(tmp_path):
     script.write_text("x")
     conf = tmp_path / "mpv.conf"
     conf.write_text("deband=yes\nosc=yes\n")
-    cfg = {"mpv_conf": str(conf), "mpv_shaders": ["s.glsl"], "mpv_scripts": [str(script)]}
+    cfg = {"mpv_conf": str(conf), "mpv_shaders": ["s.glsl"], "mpv_scripts": [str(script)]}  # mpv_shaders sudah tidak dipakai
     player = FakePlayer()
     rep = mpv_user.apply_user_settings(player, cfg, sdir)
     assert player.set_calls == {"deband": "yes"}
-    assert len(rep.shaders) == 1 and len(rep.scripts) == 1 and len(rep.rejected) == 1
+    assert rep.shaders == [] and len(rep.scripts) == 1 and len(rep.rejected) == 1
     assert "1 opsi" in rep.summary() and "1 diabaikan" in rep.summary()
 
 

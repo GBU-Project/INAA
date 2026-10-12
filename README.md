@@ -244,3 +244,11 @@ Pengaturan pengguna tersimpan otomatis di:
 - **Tangkapan Layar**: `~/Pictures/INAA/` (cuplikan frame PNG beresolusi penuh).
 
 URI yang diterima pemutar hanya berkas lokal, `file://`, `http://`, dan `https://`. `yt-dlp` hanya diaktifkan saat membuka URL http(s) dari UI. MPRIS `OpenUri` hanya menerima berkas lokal (bukan URL). Konfigurasi disimpan dengan izin `0600`. Subtitle unduhan memakai berkas sementara unik, bukan nama tetap di `/tmp`.
+
+## Ketahanan config & perbaikan terbaru
+- `config_sanitize.py` membersihkan `config.json` saat dimuat (riwayat, gain equalizer, preset kustom, shader, dll.), jadi file yang rusak atau diubah manual tidak lagi membuat aplikasi crash saat start.
+- Mode loop di Preferensi kini menandai pilihan yang aktif; riwayat tidak lagi membuka file dua kali dan file yang hilang tidak bisa diklik.
+- Shader hanya satu jalur (`custom_shaders`) dan divalidasi (ekstensi, folder); `mpv_shaders` sudah dihapus.
+- Mengaktifkan `mpv.conf` langsung berlaku (opsi aman saja); mematikannya butuh restart.
+- Nama preset kustom tidak boleh sama dengan preset bawaan.
+
