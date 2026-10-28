@@ -120,6 +120,75 @@
             ]
         },
         {
+            "name": "libplacebo",
+            "buildsystem": "meson",
+            "config-opts": [
+                "-Dvulkan=enabled",
+                "-Dshaderc=enabled"
+            ],
+            "cleanup": [
+                "/include",
+                "/lib/pkgconfig"
+            ],
+            "sources": [
+                {
+                    "type": "git",
+                    "url": "https://github.com/haasn/libplacebo.git",
+                    "mirror-urls": [
+                        "https://code.videolan.org/videolan/libplacebo.git"
+                    ],
+                    "tag": "v6.338.2",
+                    "commit": "64c1954570f1cd57f8570a57e51fb0249b57bb90"
+                }
+            ],
+            "modules": [
+                {
+                    "name": "shaderc",
+                    "buildsystem": "cmake-ninja",
+                    "builddir": true,
+                    "config-opts": [
+                        "-DSHADERC_SKIP_COPYRIGHT_CHECK=ON",
+                        "-DSHADERC_SKIP_EXAMPLES=ON",
+                        "-DSHADERC_SKIP_TESTS=ON",
+                        "-DSPIRV_SKIP_EXECUTABLES=ON",
+                        "-DENABLE_GLSLANG_BINARIES=OFF"
+                    ],
+                    "cleanup": [
+                        "/bin",
+                        "/include",
+                        "/lib/cmake",
+                        "/lib/pkgconfig"
+                    ],
+                    "sources": [
+                        {
+                            "type": "git",
+                            "url": "https://github.com/google/shaderc.git",
+                            "tag": "v2025.3",
+                            "commit": "8c2e602ce440b7739c95ff3d69cecb1adf6becda"
+                        },
+                        {
+                            "type": "git",
+                            "url": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+                            "commit": "33e02568181e3312f49a3cf33df470bf96ef293a",
+                            "dest": "third_party/spirv-tools"
+                        },
+                        {
+                            "type": "git",
+                            "url": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+                            "commit": "2a611a970fdbc41ac2e3e328802aed9985352dca",
+                            "dest": "third_party/spirv-headers"
+                        },
+                        {
+                            "type": "git",
+                            "url": "https://github.com/KhronosGroup/glslang.git",
+                            "commit": "efd24d75bcbc55620e759f6bf42c45a32abac5f8",
+                            "dest": "third_party/glslang"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
             "name": "libcdio",
             "config-opts": [ "--disable-static", "--disable-example-progs" ],
             "cleanup": [ "/include", "/lib/pkgconfig" ],
