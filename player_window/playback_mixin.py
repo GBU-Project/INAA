@@ -28,8 +28,12 @@ class PlaybackMixin:
             pass
         self._current_path = path
 
+        ext = os.path.splitext(path)[1].lower()
+        is_audio = ext in AUDIO_EXTENSIONS
+
         # Jika resume_pos tidak diberikan secara eksplisit, cari riwayat posisi terakhir dari config
-        if resume_pos is None and self._config.get("resume_playback", True):
+        # Catatan: File audio selalu diputar dari awal (0:00), resume hanya untuk video
+        if resume_pos is None and self._config.get("resume_playback", True) and not is_audio:
             recents = self._config.get("recent_files", [])
             for item in recents:
                 if item.get("path") == path:
@@ -52,8 +56,7 @@ class PlaybackMixin:
         # sedang tersembunyi, jadi kalau gl_area (halaman "video") belum
         # terlihat saat play() dipanggil, mpv render context belum ada dan
         # loadfile akan gagal secara senyap ("No render context set").
-        ext = os.path.splitext(path)[1].lower()
-        if ext in AUDIO_EXTENSIONS:
+        if is_audio:
             self.set_music_mode(True)
         else:
             if not self.music_toggle_btn.get_active():

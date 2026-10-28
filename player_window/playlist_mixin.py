@@ -91,7 +91,9 @@ class PlaylistMixin:
                 gesture.connect("released", lambda *_: self.show_toast("File tidak ditemukan"))
             else:
                 gesture = Gtk.GestureClick()
-                gesture.connect("released", lambda _g, _n, _x, _y, p=path, resume_pos=pos: self.open_file(p, resume_pos=resume_pos))
+                ext = os.path.splitext(path)[1].lower()
+                r_pos = None if ext in AUDIO_EXTENSIONS else pos
+                gesture.connect("released", lambda _g, _n, _x, _y, p=path, resume_pos=r_pos: self.open_file(p, resume_pos=resume_pos))
             row.add_controller(gesture)
 
             self.recent_listbox.append(row)

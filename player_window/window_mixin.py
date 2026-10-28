@@ -468,7 +468,8 @@ class WindowMixin:
                     opened[0] = True
                     dialog.destroy()
                     # Hampir selesai ditonton -> mulai dari awal, bukan dari ujung.
-                    if resume_pos and dur and resume_pos >= dur - 5:
+                    ext = os.path.splitext(p)[1].lower()
+                    if ext in AUDIO_EXTENSIONS or (resume_pos and dur and resume_pos >= dur - 5):
                         resume_pos = 0
                     self.open_file(p, resume_pos=resume_pos or None)
 
