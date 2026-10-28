@@ -20,6 +20,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Configure Git Credentials for Private Repo
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
       - name: Validate AppStream metainfo
         run: |
           appstreamcli validate --no-net flatpak/io.github.inaa.metainfo.xml || true
