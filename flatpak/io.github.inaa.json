@@ -139,6 +139,12 @@
                     ],
                     "tag": "v6.338.2",
                     "commit": "64c1954570f1cd57f8570a57e51fb0249b57bb90"
+                },
+                {
+                    "type": "shell",
+                    "commands": [
+                        "sed -i 's/registry = VkXML(ET.parse(xmlfile))/tree = ET.parse(xmlfile)\\n    registry = VkXML(tree.getroot())/' src/vulkan/utils_gen.py"
+                    ]
                 }
             ],
             "modules": [
