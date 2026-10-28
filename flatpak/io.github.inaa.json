@@ -235,12 +235,9 @@
             ],
             "sources": [
                 {
-                    "//": "For a real build, replace this with a pinned git commit/tag of your own",
-                    "//_2": "repo (type: git, url: https://github.com/<you>/INAA.git, tag/commit: ...).",
-                    "//_3": "'type: dir' below just builds whatever is checked out locally, which is",
-                    "//_4": "the easiest way to test the manifest against your working tree first.",
-                    "type": "dir",
-                    "path": ".."
+                    "type": "git",
+                    "url": "https://github.com/GBU-Project/INAA.git",
+                    "tag": "v0.2.0"
                 }
             ]
         }

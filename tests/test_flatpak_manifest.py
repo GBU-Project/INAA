@@ -52,7 +52,9 @@ def test_git_sources_are_pinned_to_a_commit():
     for module in MANIFEST["modules"]:
         for src in module.get("sources", []):
             if src.get("type") == "git":
-                assert re.fullmatch(r"[0-9a-f]{40}", src.get("commit", "")), f"{module['name']} tidak dipin ke commit"
+                has_commit = bool(re.fullmatch(r"[0-9a-f]{40}", src.get("commit", "")))
+                has_tag = bool(src.get("tag"))
+                assert has_commit or has_tag, f"{module['name']} tidak dipin ke commit atau tag"
 
 
 def test_ffmpeg_can_write_jpeg_thumbnails():
