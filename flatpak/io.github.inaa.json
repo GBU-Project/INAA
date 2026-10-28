@@ -91,7 +91,7 @@
                 "--enable-libdav1d"
             ],
             "sources": [
-                { "type": "git", "url": "https://git.ffmpeg.org/ffmpeg.git", "tag": "n6.1.1", "commit": "e38092ef9395d7049f871ef4d5411eb410e283e0" }
+                { "type": "git", "url": "https://github.com/FFmpeg/FFmpeg.git", "tag": "n6.1.1", "commit": "e38092ef9395d7049f871ef4d5411eb410e283e0" }
             ]
         },
         {
