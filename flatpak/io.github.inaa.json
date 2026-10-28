@@ -268,7 +268,7 @@
             "name": "python3-pydbus",
             "buildsystem": "simple",
             "build-commands": [
-                "pip3 install --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} pydbus"
+                "pip3 install --no-build-isolation --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} pydbus"
             ],
             "sources": [
                 {
@@ -282,7 +282,7 @@
             "name": "python3-python-mpv",
             "buildsystem": "simple",
             "build-commands": [
-                "pip3 install --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} python-mpv"
+                "pip3 install --no-build-isolation --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} python-mpv"
             ],
             "sources": [
                 {

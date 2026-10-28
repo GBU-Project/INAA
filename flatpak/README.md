@@ -1,12 +1,15 @@
 # Membangun INAA sebagai Flatpak
 
-Manifest ini (`io.github.inaa.json`) belum pernah di-build dengan `flatpak-builder`
-sungguhan — lingkungan yang dipakai untuk menyusunnya tidak punya akses untuk
-menginstal `flatpak-builder` (masalah jaringan/mirror di sandbox tempat manifest ini
-ditulis, bukan masalah pada manifest-nya). Jadi anggap ini **starting point yang
-solid**, bukan sesuatu yang sudah terbukti build hijau — kamu perlu build sekali di
-mesin Linux sungguhan untuk menangkap typo/kesalahan config-opts yang mungkin lolos
-dari review manual.
+Manifest ini (`io.github.inaa.json`) sudah terbukti build hijau dengan
+`flatpak-builder` 1.4.9 di atas `org.gnome.Sdk//50`: seluruh rantai libmpv
+(luajit/ffmpeg/libplacebo/mpv) terkompilasi, aplikasi ter-install, dan bisa
+dijalankan (`flatpak run io.github.inaa`). Catatan build terakhir: modul
+`pydbus`/`python-mpv` butuh `pip3 install --no-build-isolation`, karena sandbox
+build tidak punya akses jaringan untuk mengunduh `setuptools` saat build isolation
+aktif (SDK sendiri sudah menyediakan setuptools).
+
+Kalau `flatpak-builder` tidak tersedia di host, seluruh proses bisa dijalankan
+lewat Flatpak `org.flatpak.Builder` (lihat bagian build di bawah).
 
 ## Yang sudah diverifikasi (bukan tebakan)
 
@@ -49,6 +52,19 @@ flatpak-builder --force-clean --user --install build-dir flatpak/io.github.inaa.
 flatpak run io.github.inaa
 ```
 
+Kalau `flatpak-builder` tidak bisa dipasang di host (tanpa root), pakai Flatpak
+`org.flatpak.Builder`. SDK yang terpasang di instalasi *user* tidak terlihat sebagai
+runtime "system" oleh flatpak-builder, jadi arahkan `FLATPAK_SYSTEM_DIR` ke sana:
+
+```bash
+flatpak install --user flathub org.flatpak.Builder org.gnome.Sdk//50 org.gnome.Platform//50
+flatpak run --env=FLATPAK_SYSTEM_DIR="$HOME/.local/share/flatpak" \
+  --command=flatpak-builder org.flatpak.Builder \
+  --force-clean --install \
+  --state-dir="$PWD/.flatpak-build/state" "$PWD/.flatpak-build/build" \
+  flatpak/io.github.inaa.json
+```
+
 Build pertama akan lama (mengkompilasi ffmpeg + libplacebo-equivalent chain dari
 source) — ini wajar, sama seperti Celluloid/mpv Flatpak lain.
 
@@ -73,6 +89,6 @@ Kemungkinan besar di salah satu titik ini duluan:
   (belum ada `<screenshot>` sungguhan, belum lolos review guideline Flathub
   sepenuhnya). Lihat https://docs.flathub.org/docs/for-app-authors/submission/
   untuk checklist lengkapnya.
-- **Belum ada CI** yang otomatis build Flatpak ini tiap push (lihat juga catatan
-  "no CI" di audit sebelumnya — kalau nanti dibuatkan GitHub Actions, action resmi
-  `flatpak/flatpak-github-actions` tinggal dipoint ke manifest ini).
+- **CI Flatpak** ada di `.github/workflows/flatpak.yml` (build + artifact, dan
+  release otomatis untuk tag `v*`), tetapi baru tervalidasi lewat build lokal —
+  belum pernah dijalankan di GitHub Actions.
