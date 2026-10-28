@@ -81,6 +81,7 @@
                 "--disable-static",
                 "--enable-gnutls",
                 "--disable-doc",
+                "--disable-vulkan",
                 "--disable-encoders",
                 "--disable-muxers",
                 "--enable-encoder=png",
