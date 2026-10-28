@@ -1,4 +1,6 @@
-from .common import *  # noqa: F401,F403
+from gi.repository import Gtk
+
+from .common import PLUGINS_DIR
 
 
 class PrefsMixin:

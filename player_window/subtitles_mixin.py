@@ -1,5 +1,12 @@
 """Subtitle track selection/styling and local/online subtitle loading."""
-from .common import *  # noqa: F401,F403
+import os
+import threading
+
+from gi.repository import Gio, GLib, Gtk
+
+from opensubtitles import download_subtitle, search_subtitles
+
+from .media_types import SUBTITLE_EXTENSIONS
 
 
 class SubtitlesMixin:

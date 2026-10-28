@@ -3,7 +3,7 @@ import logging
 
 import audio_devices
 
-from .common import *  # noqa: F401,F403
+from gi.repository import Gtk
 
 
 class AudioDeviceMixin:

@@ -1,5 +1,20 @@
 """Mouse/keyboard/gesture handling, seekbar scrubbing, thumbnail previews."""
-from .common import *  # noqa: F401,F403
+import os
+import subprocess
+import threading
+
+from gi.repository import Gdk, GLib, Gtk
+
+from fmt import format_time as _format_time
+from keybindings import combo_from_event, invert_shortcuts, merge_shortcuts
+from media_uri import is_local_media_file
+
+from .media_types import (
+    AUDIO_EXTENSIONS,
+    SEEK_STEP_SECONDS,
+    SUBTITLE_EXTENSIONS,
+    VOLUME_STEP,
+)
 
 
 class InputMixin:

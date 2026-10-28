@@ -1,5 +1,9 @@
 """Video/audio inspector controls: hwdec, aspect/crop/rotate, filter presets."""
-from .common import *  # noqa: F401,F403
+import os
+
+from gi.repository import GLib, Gtk
+
+from .common import SHADERS_DIR
 import logging
 
 import audio_filters

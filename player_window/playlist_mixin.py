@@ -1,5 +1,17 @@
 """Recent files, folder auto-discovery, sidebar playlist and config persistence."""
-from .common import *  # noqa: F401,F403
+import datetime
+import os
+import time
+
+from gi.repository import Gtk, Pango
+
+from fmt import display_name as _display_name, format_time as _format_time
+from m3u_parser import export_m3u, parse_m3u
+from media_uri import is_allowed_media_uri, is_local_media_file, normalize_media_uri
+from playlist_nav import next_playlist_index
+
+from .common import _save_config
+from .media_types import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 
 
 class PlaylistMixin:

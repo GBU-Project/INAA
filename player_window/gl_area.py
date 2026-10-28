@@ -1,5 +1,14 @@
 """MpvGLArea: the GTK4 GLArea widget that mpv renders video frames into."""
-from .common import *  # noqa: F401,F403  (Gtk, GLib, mpv, GObject, ctypes, GL helpers, ...)
+import ctypes
+
+import mpv
+from gi.repository import Gdk, GLib, GObject, Gtk
+
+from .common import (
+    GL_DRAW_FRAMEBUFFER_BINDING,
+    _get_proc_address_wrapper,
+    _gl_get_integerv,
+)
 
 
 class MpvGLArea(Gtk.GLArea):

@@ -20,6 +20,7 @@ import hashlib
 import os
 
 from media_uri import is_local_media_file, normalize_media_uri
+from playlist_nav import loop_status_mpris
 
 try:
     from pydbus import SessionBus
@@ -228,7 +229,6 @@ class MprisPlayer:
 
     @property
     def LoopStatus(self):
-        from playlist_nav import loop_status_mpris
         return loop_status_mpris(getattr(self._win, "_loop_mode", "off"))
 
     @LoopStatus.setter

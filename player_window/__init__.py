@@ -30,6 +30,7 @@ Module layout (split from a single 2800+ line file for maintainability):
         subtitles_mixin.py    SubtitlesMixin      - subtitle tracks/styling
         filters_mixin.py      FiltersMixin        - video/audio inspector
         input_mixin.py        InputMixin          - mouse/keyboard/gestures
+        shortcuts_mixin.py    ShortcutsMixin      - shortcut editor dialog
         window_mixin.py       WindowMixin         - toasts, screenshots,
                                                      mini-player, dialogs
 
@@ -40,7 +41,14 @@ Module layout (split from a single 2800+ line file for maintainability):
     is unchanged, only the internal organization is.
 --------------------------------------------------------------------------
 """
-from .common import *  # noqa: F401,F403
+import shutil
+import tempfile
+
+from gi.repository import GLib, Gtk
+
+from mpris import MprisPlayer
+
+from .common import _load_config, _save_config
 from .gl_area import MpvGLArea
 from .ui_builder import UIBuilderMixin
 from .playlist_mixin import PlaylistMixin
@@ -48,9 +56,13 @@ from .playback_mixin import PlaybackMixin
 from .subtitles_mixin import SubtitlesMixin
 from .filters_mixin import FiltersMixin
 from .input_mixin import InputMixin
+from .shortcuts_mixin import ShortcutsMixin
 from .window_mixin import WindowMixin
 from .prefs_mixin import PrefsMixin
 from .audio_device_mixin import AudioDeviceMixin
+from .theme import _apply_iina_css
+
+__all__ = ["PlayerWindow", "MpvGLArea"]
 
 
 class PlayerWindow(
@@ -58,6 +70,7 @@ class PlayerWindow(
     AudioDeviceMixin,
     WindowMixin,
     InputMixin,
+    ShortcutsMixin,
     FiltersMixin,
     SubtitlesMixin,
     PlaybackMixin,

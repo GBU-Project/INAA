@@ -1,5 +1,13 @@
 """Core transport: open/play/pause, volume, speed, chapters, A-B loop, music mode, state polling."""
-from .common import *  # noqa: F401,F403
+import os
+
+from gi.repository import GLib, Gtk
+
+from fmt import display_name as _display_name, format_speed, format_time as _format_time
+from media_uri import is_allowed_media_uri, is_http_media_uri, normalize_media_uri
+from playlist_nav import auto_advance_index
+
+from .media_types import AUDIO_EXTENSIONS
 
 
 class PlaybackMixin:

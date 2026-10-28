@@ -1,5 +1,8 @@
 """Widget construction: header bar, welcome screen, music view, inspector tabs, drag&drop, signal wiring."""
-from .common import *  # noqa: F401,F403
+from gi.repository import Gdk, Gio, Gtk, Pango
+
+from fmt import format_speed
+
 from .gl_area import MpvGLArea
 import audio_filters
 

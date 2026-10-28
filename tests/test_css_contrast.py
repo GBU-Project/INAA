@@ -2,7 +2,7 @@
 import re
 from pathlib import Path
 
-SRC = (Path(__file__).resolve().parent.parent / "player_window" / "common.py").read_text()
+SRC = (Path(__file__).resolve().parent.parent / "player_window" / "theme.py").read_text()
 
 
 def _rule(selector_fragment):
