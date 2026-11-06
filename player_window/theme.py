@@ -46,7 +46,11 @@ _IINA_CSS = b"""
     background-color: rgba(28, 28, 30, 0.96);
     border-left: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.35);
-    min-width: 320px;
+}
+
+.iina-dock-paned > separator {
+    background-color: rgba(255, 255, 255, 0.10);
+    min-width: 1px;
 }
 
 .iina-sec-title {
@@ -315,13 +319,11 @@ _IINA_CSS = b"""
 
 .iina-thumb-grid-item {
     border-radius: 4px;
-    overflow: hidden;
     transition: transform 120ms ease-out;
 }
 
 .iina-thumb-grid-item:hover {
     transform: scale(1.08);
-    z-index: 1;
 }
 
 .iina-thumb-time-label {

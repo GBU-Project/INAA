@@ -345,6 +345,9 @@ class InputMixin:
                     picture.set_pixbuf(sub_pixbuf)
                     picture.set_size_request(160, 90)
                     picture.add_css_class("iina-thumb-grid-item")
+                    # Ganti CSS `overflow: hidden` (tidak didukung GTK): potong
+                    # gambar ke border-radius agar sudut tetap membulat.
+                    picture.set_overflow(Gtk.Overflow.HIDDEN)
 
                     # Add time label overlay
                     time_label = Gtk.Label(label=_format_time(sec))

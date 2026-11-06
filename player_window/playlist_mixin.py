@@ -285,7 +285,12 @@ class PlaylistMixin:
             self.sidebar_list.select_row(row)
 
     def on_playlist_toggled(self, button):
-        self.sidebar.set_visible(button.get_active())
+        visible = button.get_active()
+        layout = getattr(self, "dock_layout", None)
+        if layout is not None:
+            layout.set_dock_visible("playlist", visible)
+        else:
+            self.sidebar.set_visible(visible)
 
     def on_playlist_row_activated(self, listbox, row):
         index = row.get_index()

@@ -298,7 +298,7 @@
             "buildsystem": "simple",
             "build-commands": [
                 "install -d /app/share/inaa",
-                "cp -r main.py player_window plugins audio_devices.py audio_filters.py config_sanitize.py fmt.py keybindings.py logging_setup.py m3u_parser.py media_uri.py mpris.py mpv_user.py opensubtitles.py playlist_nav.py plugin_loader.py /app/share/inaa/",
+                "cp -r main.py player_window plugins audio_devices.py audio_filters.py config_sanitize.py fmt.py keybindings.py layout_config.py logging_setup.py m3u_parser.py media_uri.py mpris.py mpv_user.py opensubtitles.py playlist_nav.py plugin_loader.py /app/share/inaa/",
 
                 "install -Dm755 flatpak/inaa-launcher /app/bin/inaa",
 

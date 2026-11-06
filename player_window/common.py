@@ -19,6 +19,7 @@ import json
 from pathlib import Path
 
 from config_sanitize import sanitize_config
+from layout_config import CONFIG_VERSION, default_layout
 
 # mpv internal parser & shader compiler requires LC_NUMERIC="C"
 try:
@@ -68,6 +69,9 @@ def _load_config():
                 data.setdefault("audio_special_effect", "none")
                 data.setdefault("audio_custom_presets", {})
                 data.setdefault("audio_device", "auto")
+                # config_version sengaja tidak di-set di sini: sanitize_config
+                # yang menaikkannya sekaligus memigrasikan auto_hide_chrome.
+                data.setdefault("ui_layout_v2", False)
                 sanitize_config(data)
                 try:
                     CONFIG_DIR.chmod(0o700)
@@ -78,6 +82,9 @@ def _load_config():
     except Exception:
         pass
     return {
+        "config_version": CONFIG_VERSION,
+        "ui_layout_v2": False,
+        "layout": default_layout(),
         "volume": 100,
         "width": 1000,
         "height": 620,

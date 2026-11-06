@@ -1,5 +1,7 @@
 from gi.repository import Gtk
 
+from layout_config import LayoutState, default_layout, sanitize_layout
+
 from .common import PLUGINS_DIR
 
 
@@ -79,6 +81,7 @@ class PrefsMixin:
         categories = [
             ("general", "General", "preferences-system-symbolic", self._prefs_general_page()),
             ("interface", "Interface", "preferences-desktop-display-symbolic", self._prefs_interface_page()),
+            ("layout", "Layout", "view-grid-symbolic", self._prefs_layout_page()),
             ("video", "Video", "video-x-generic-symbolic", self._prefs_video_page()),
             ("audio", "Audio", "audio-x-generic-symbolic", self._prefs_audio_page()),
             ("subtitles", "Subtitles", "media-view-subtitles-symbolic", self._prefs_subtitles_page()),
@@ -286,6 +289,142 @@ class PrefsMixin:
         ))
         box.append(card2)
         return box
+
+    def _prefs_layout_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+        title = Gtk.Label(label="Layout")
+        title.set_xalign(0)
+        title.add_css_class("iina-prefs-header-title")
+        box.append(title)
+
+        box.append(self._prefs_section_title("Dockable Layout (v2)"))
+        card0 = self._prefs_card()
+        card0.append(self._prefs_switch_row(
+            "Aktifkan layout dock",
+            "ui_layout_v2",
+            False,
+            subtitle="Playlist dan inspector bisa dipindah kiri/kanan, lebarnya disimpan.",
+            on_change=self._on_layout_v2_changed,
+        ))
+        box.append(card0)
+
+        box.append(self._prefs_section_title("Dock Playlist"))
+        box.append(self._layout_dock_card("playlist", "Playlist"))
+
+        box.append(self._prefs_section_title("Dock Inspector"))
+        box.append(self._layout_dock_card("inspector", "Inspector"))
+
+        reset_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        reset_row.add_css_class("iina-pref-card-row")
+        lbl = Gtk.Label(label="Kembalikan layout ke bawaan")
+        lbl.set_xalign(0)
+        lbl.set_hexpand(True)
+        reset_row.append(lbl)
+        reset_btn = Gtk.Button(label="Reset Layout")
+        reset_btn.connect("clicked", self._reset_layout)
+        reset_row.append(reset_btn)
+        box.append(reset_row)
+        return box
+
+    def _layout_dock_card(self, name, label):
+        state = LayoutState.from_dict(self._config.get("layout"))
+        edge = getattr(state, f"{name}_edge")
+        visible = getattr(state, f"{name}_visible")
+        width = getattr(state, f"{name}_width")
+
+        card = self._prefs_card()
+
+        # Baris visibilitas
+        vis_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        vis_row.add_css_class("iina-pref-card-row")
+        vis_lbl = Gtk.Label(label=f"Tampilkan {label}")
+        vis_lbl.set_xalign(0)
+        vis_lbl.set_hexpand(True)
+        vis_row.append(vis_lbl)
+        vis_sw = Gtk.Switch()
+        vis_sw.set_active(bool(visible) and edge != "hidden")
+        vis_sw.set_valign(Gtk.Align.CENTER)
+        vis_sw.connect(
+            "notify::active",
+            lambda w, _p, n=name: self._update_layout_dock(n, "visible", w.get_active()),
+        )
+        vis_row.append(vis_sw)
+        card.append(vis_row)
+
+        # Baris sisi dock
+        edge_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        edge_row.add_css_class("iina-pref-card-row")
+        edge_lbl = Gtk.Label(label=f"Sisi {label}")
+        edge_lbl.set_xalign(0)
+        edge_lbl.set_hexpand(True)
+        edge_row.append(edge_lbl)
+        edges = ["Kiri", "Kanan", "Sembunyi"]
+        edge_ids = ["left", "right", "hidden"]
+        dropdown = Gtk.DropDown.new_from_strings(edges)
+        dropdown.set_selected(edge_ids.index(edge) if edge in edge_ids else 0)
+        dropdown.set_valign(Gtk.Align.CENTER)
+        dropdown.connect(
+            "notify::selected",
+            lambda d, _p, n=name, ids=edge_ids: self._update_layout_dock(
+                n, "edge", ids[d.get_selected()]
+            ),
+        )
+        edge_row.append(dropdown)
+        card.append(edge_row)
+
+        # Baris lebar pane
+        width_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        width_row.add_css_class("iina-pref-card-row")
+        width_lbl = Gtk.Label(label=f"Lebar {label}")
+        width_lbl.set_xalign(0)
+        width_lbl.set_hexpand(True)
+        width_row.append(width_lbl)
+        spin = Gtk.SpinButton.new_with_range(160, 600, 10)
+        spin.set_value(int(width))
+        spin.set_valign(Gtk.Align.CENTER)
+        spin.connect(
+            "value-changed",
+            lambda s, n=name: self._update_layout_dock(n, "width", int(s.get_value())),
+        )
+        width_row.append(spin)
+        px = Gtk.Label(label="px")
+        px.add_css_class("dim-label")
+        width_row.append(px)
+        card.append(width_row)
+        return card
+
+    def _update_layout_dock(self, name, key, value):
+        state = LayoutState.from_dict(self._config.get("layout"))
+        if key == "visible" and value and getattr(state, f"{name}_edge") == "hidden":
+            default_edge = "left" if name == "playlist" else "right"
+            setattr(state, f"{name}_edge", default_edge)
+        setattr(state, f"{name}_{key}", value)
+        if key == "edge" and value == "hidden":
+            setattr(state, f"{name}_visible", False)
+        self._config["layout"] = sanitize_layout(state.to_dict())
+        layout = getattr(self, "dock_layout", None)
+        if layout is not None:
+            if key == "width":
+                layout.set_width(name, self._config["layout"][name]["width"])
+            else:
+                layout.apply_config()
+        self._save_config_throttled(force=True)
+
+    def _on_layout_v2_changed(self, enabled):
+        self._config["ui_layout_v2"] = bool(enabled)
+        self._config["layout"] = sanitize_layout(self._config.get("layout"))
+        layout = getattr(self, "dock_layout", None)
+        if layout is not None:
+            layout.apply_config()
+        self._save_config_throttled(force=True)
+
+    def _reset_layout(self, _button=None):
+        self._config["layout"] = default_layout()
+        layout = getattr(self, "dock_layout", None)
+        if layout is not None:
+            layout.reset()
+        self._save_config_throttled(force=True)
 
     def _prefs_video_page(self):
         """Matches the IINA 1.5.0 Video Settings screenshot."""

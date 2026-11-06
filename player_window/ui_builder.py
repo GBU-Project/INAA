@@ -4,6 +4,7 @@ from gi.repository import Gdk, Gio, Gtk, Pango
 from fmt import format_speed
 
 from .gl_area import MpvGLArea
+from .layout import DockLayout
 import audio_filters
 
 
@@ -96,12 +97,11 @@ class UIBuilderMixin:
         prefs_btn.connect("clicked", self.open_preferences)
         self.header.pack_end(prefs_btn)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        self.set_child(root)
+        # Root layout dibangun oleh DockLayout setelah semua widget dock ada
+        # (playlist di kiri, video di tengah, inspector di kanan).
 
         # Playlist sidebar (Kiri)
         self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.sidebar.set_size_request(240, -1)
         self.sidebar.add_css_class("iina-sidebar")
 
         # Toolbar aksi playlist (Buka M3U, Simpan M3U, Hapus)
@@ -151,13 +151,11 @@ class UIBuilderMixin:
         sidebar_scroll.set_vexpand(True)
         self.sidebar.append(sidebar_scroll)
         self.sidebar.set_visible(False)
-        root.append(self.sidebar)
 
         # Main video area with Overlay for Floating OSD
         self.video_overlay = Gtk.Overlay()
         self.video_overlay.set_hexpand(True)
         self.video_overlay.set_vexpand(True)
-        root.append(self.video_overlay)
 
         # Stack to switch between Video (MpvGLArea) and Music View
         self.display_stack = Gtk.Stack()
@@ -368,7 +366,11 @@ class UIBuilderMixin:
         # ----------------- INSPECTOR PANEL (Kanan - macOS IINA Style) -----------------
         self.inspector_panel = self._build_inspector_panel()
         self.inspector_panel.set_visible(False)
-        root.append(self.inspector_panel)
+
+        # Susun sidebar + video + inspector sebagai rantai Gtk.Paned.
+        self.dock_layout = DockLayout(
+            self, self._config, self.sidebar, self.inspector_panel, self.video_overlay
+        )
 
         # Key controller
         key_controller = Gtk.EventControllerKey()
@@ -520,7 +522,6 @@ class UIBuilderMixin:
 
     def _build_inspector_panel(self):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        panel.set_size_request(320, -1)
         panel.set_hexpand(False)
         panel.add_css_class("iina-inspector")
         panel.set_margin_start(0)

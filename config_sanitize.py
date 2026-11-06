@@ -8,6 +8,11 @@ import math
 
 from audio_devices import AUTO as _AUTO_DEVICE, is_valid_name as _valid_device
 from audio_filters import EQ_PRESETS, SPECIAL_AUDIO_EFFECTS, clamp_gain
+from layout_config import (
+    CONFIG_VERSION,
+    migrate_layout_config,
+    sanitize_layout,
+)
 
 MAX_RECENT = 300
 MAX_TEXT = 4096
@@ -96,4 +101,15 @@ def sanitize_config(data):
     data["volume"] = _num(data.get("volume"), 100, 0, 100)
     data["width"] = int(_num(data.get("width"), 1000, 200, 10000))
     data["height"] = int(_num(data.get("height"), 620, 150, 10000))
+
+    flag = data.get("ui_layout_v2")
+    if isinstance(flag, bool):
+        data["ui_layout_v2"] = flag
+    elif isinstance(flag, int) and flag in (0, 1):
+        data["ui_layout_v2"] = bool(flag)
+    else:
+        data["ui_layout_v2"] = False
+    migrate_layout_config(data)
+    data["layout"] = sanitize_layout(data.get("layout"))
+    data["config_version"] = CONFIG_VERSION
     return data

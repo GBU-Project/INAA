@@ -177,11 +177,13 @@ INAA/
 │   ├── filters_mixin.py  # Video equalizer, crop, & audio filter
 │   ├── input_mixin.py    # Gesture, scroll seek, & keyboard shortcuts
 │   ├── window_mixin.py   # Mini player, PiP, toast, & screenshot
+│   ├── layout.py         # Controller dock Gtk.Paned (edge, lebar, visibility)
 │   ├── prefs_mixin.py    # Jendela Pengaturan (Ctrl+P)
 │   └── common.py         # Config, shared helper, styling & GL proc loader
 ├── playlist_nav.py    # Logika next/loop/shuffle playlist
 ├── mpris.py           # Integrasi MPRIS2 Linux (D-Bus session bus)
 ├── media_uri.py       # Validasi URI file/http/https
+├── layout_config.py   # Skema layout murni (validasi, preset, migrasi config)
 ├── plugin_loader.py   # Loader plugin Info.json (opt-in, API terbatas)
 ├── opensubtitles.py   # Pencarian/unduh subtitle dengan host & size limit
 ├── inaa               # Bash launcher script untuk ~/.local/bin
@@ -189,7 +191,8 @@ INAA/
 ├── inaa.png           # Ikon aplikasi INAA
 ├── logging_setup.py   # Rotating log file (~/.config/inaa/logs/) + crash handling
 ├── keybindings.py     # Skema shortcut default (dipakai oleh input_mixin.py)
-├── tests/             # Unit test (pytest/unittest) untuk media_uri.py & plugin_loader.py
+├── tests/             # Unit test (pytest) untuk modul murni & smoke test GTK/mpv
+├── docs/              # Roadmap plugin & layout
 ├── flatpak/           # Manifest Flatpak (io.github.inaa.json) + panduan build
 ├── LICENSE            # MIT
 ├── requirements.txt   # Dependensi pustaka Python (python-mpv, PyGObject, pydbus)
@@ -206,6 +209,26 @@ Flatpak di `flatpak/io.github.inaa.json` yang membangun INAA beserta libmpv dari
 source (jadi tidak bergantung pada versi libmpv/ffmpeg yang terpasang di sistem).
 Lihat `flatpak/README.md` untuk cara build, apa yang sudah diverifikasi, dan apa
 yang masih perlu dicek sebelum build produksi/submit ke Flathub.
+
+---
+
+## Roadmap Plugin & Layout
+
+Rencana pengembangan sistem plugin (API v2, capability, isolasi proses) dan
+layout/tema (dock yang bisa diatur, OSC, palet warna) ada di
+[`docs/ROADMAP-plugin-layout.md`](docs/ROADMAP-plugin-layout.md). Dokumen itu
+memuat audit kondisi saat ini, target, fase pekerjaan, skema config, dan
+strategi pengujian.
+
+Layout dock (playlist/inspector bisa dipindah kiri/kanan dan lebarnya diingat)
+aktif lewat **Settings → Layout → Aktifkan layout dock**, atau:
+
+```bash
+INAA_LAYOUT_V2=1 inaa
+```
+
+Saat flag mati, perilaku lama dipertahankan (playlist kiri, inspector kanan,
+keduanya tersembunyi sampai tombolnya ditekan).
 
 ---
 

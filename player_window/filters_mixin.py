@@ -15,7 +15,11 @@ class FiltersMixin:
 
     def on_inspector_toggled(self, button):
         visible = button.get_active()
-        self.inspector_panel.set_visible(visible)
+        layout = getattr(self, "dock_layout", None)
+        if layout is not None:
+            layout.set_dock_visible("inspector", visible)
+        else:
+            self.inspector_panel.set_visible(visible)
         if visible:
             self._refresh_inspector_tracks()
             self._refresh_shader_ui()
@@ -308,7 +312,6 @@ class FiltersMixin:
         btn_full_eq.add_css_class("iina-seg-btn")
         def open_full_eq_tab(_b):
             self.filters_popover.popdown()
-            self.inspector_panel.set_visible(True)
             self.inspector_btn.set_active(True)
             if hasattr(self, "insp_stack"):
                 self.insp_stack.set_visible_child_name("audio")

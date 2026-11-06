@@ -201,8 +201,11 @@ class PlaybackMixin:
         if self._is_mini:
             self._normal_size = (self.get_width(), self.get_height())
             self.header.set_visible(False)
-            self.sidebar.set_visible(False)
-            self.inspector_panel.set_visible(False)
+            if hasattr(self, "dock_layout"):
+                self.dock_layout.set_suppressed(True)
+            else:
+                self.sidebar.set_visible(False)
+                self.inspector_panel.set_visible(False)
             self.set_default_size(360, 220)
             self._set_always_on_top(bool(self._config.get("keep_above_mini", True)))
             self.osd_box.set_visible(True)
@@ -211,10 +214,13 @@ class PlaybackMixin:
             self.header.set_visible(True)
             self.set_default_size(*self._normal_size)
             self._set_always_on_top(False)
-            if self.playlist_toggle.get_active():
-                self.sidebar.set_visible(True)
-            if self.inspector_btn.get_active():
-                self.inspector_panel.set_visible(True)
+            if hasattr(self, "dock_layout"):
+                self.dock_layout.set_suppressed(False)
+            else:
+                if self.playlist_toggle.get_active():
+                    self.sidebar.set_visible(True)
+                if self.inspector_btn.get_active():
+                    self.inspector_panel.set_visible(True)
 
     def _set_always_on_top(self, enabled):
         try:
@@ -348,10 +354,15 @@ class PlaybackMixin:
             max_w, max_h = 1600, 900
         chrome_h = 48 if self.header.get_visible() else 0
         extra_w = 0
-        if self.sidebar.get_visible():
-            extra_w += 240
-        if self.inspector_panel.get_visible():
-            extra_w += 280
+        dock_layout = getattr(self, "dock_layout", None)
+        if dock_layout is not None:
+            extra_w += dock_layout.visible_width("playlist")
+            extra_w += dock_layout.visible_width("inspector")
+        else:
+            if self.sidebar.get_visible():
+                extra_w += 240
+            if self.inspector_panel.get_visible():
+                extra_w += 280
         scale = min(max_w / max(w + extra_w, 1), max_h / max(h + chrome_h, 1), 1.0)
         target_w = max(480, int(w * scale) + extra_w)
         target_h = max(270, int(h * scale) + chrome_h)
