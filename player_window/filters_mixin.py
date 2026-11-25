@@ -4,6 +4,7 @@ import os
 from gi.repository import GLib, Gtk
 
 from .common import SHADERS_DIR
+from .file_dialogs import pick_files
 import logging
 
 import audio_filters
@@ -133,37 +134,14 @@ class FiltersMixin:
 
     def _open_shader_chooser(self, _button):
         """Dialog pemilih file shader .hook atau .glsl."""
-        dialog = Gtk.FileChooserDialog(
-            title="Pilih Custom GLSL Shader",
-            transient_for=self,
-            action=Gtk.FileChooserAction.OPEN,
+        pick_files(
+            self,
+            "Pilih Custom GLSL Shader",
+            lambda paths: self._add_custom_shader(paths[0]),
+            patterns=("*.hook", "*.glsl"),
+            pattern_name="GLSL / mpv Shaders (*.hook, *.glsl)",
+            include_all=True,
         )
-        dialog.add_buttons(
-            "_Batal", Gtk.ResponseType.CANCEL,
-            "_Pilih", Gtk.ResponseType.OK,
-        )
-        f_filter = Gtk.FileFilter()
-        f_filter.set_name("GLSL / mpv Shaders (*.hook, *.glsl)")
-        f_filter.add_pattern("*.hook")
-        f_filter.add_pattern("*.glsl")
-        dialog.add_filter(f_filter)
-
-        all_filter = Gtk.FileFilter()
-        all_filter.set_name("Semua Berkas")
-        all_filter.add_pattern("*")
-        dialog.add_filter(all_filter)
-
-        def on_response(dlg, response):
-            if response == Gtk.ResponseType.OK:
-                gfile = dlg.get_file()
-                if gfile:
-                    path = gfile.get_path()
-                    if path:
-                        self._add_custom_shader(path)
-            dlg.destroy()
-
-        dialog.connect("response", on_response)
-        dialog.show()
 
     def _refresh_shader_ui(self):
         if hasattr(self, "insp_shader_status_label"):
@@ -249,7 +227,8 @@ class FiltersMixin:
             self.show_toast(f"Gagal menghapus shader: {e}")
         self._refresh_shader_ui()
 
-    def _rebuild_filters_menu(self):
+    def _rebuild_filters_menu(self, popover=None):
+        target = popover or self.filters_popover
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.set_margin_start(12)
         box.set_margin_end(12)
@@ -295,23 +274,23 @@ class FiltersMixin:
         eq_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         btn_bass = Gtk.Button(label="Bass+")
         btn_bass.add_css_class("iina-seg-btn")
-        btn_bass.connect("clicked", lambda *_: self._set_audio_filter("bassboost"))
+        btn_bass.connect("clicked", lambda *_: self._set_audio_filter("bassboost", target))
         eq_box.append(btn_bass)
 
         btn_vocal = Gtk.Button(label="Vocal+")
         btn_vocal.add_css_class("iina-seg-btn")
-        btn_vocal.connect("clicked", lambda *_: self._set_audio_filter("vocal"))
+        btn_vocal.connect("clicked", lambda *_: self._set_audio_filter("vocal", target))
         eq_box.append(btn_vocal)
 
         btn_night = Gtk.Button(label="Night Mode")
         btn_night.add_css_class("iina-seg-btn")
-        btn_night.connect("clicked", lambda *_: self._set_audio_filter("nightmode"))
+        btn_night.connect("clicked", lambda *_: self._set_audio_filter("nightmode", target))
         eq_box.append(btn_night)
 
         btn_full_eq = Gtk.Button(label="Equalizer 10 Band...")
         btn_full_eq.add_css_class("iina-seg-btn")
         def open_full_eq_tab(_b):
-            self.filters_popover.popdown()
+            target.popdown()
             self.inspector_btn.set_active(True)
             if hasattr(self, "insp_stack"):
                 self.insp_stack.set_visible_child_name("audio")
@@ -321,10 +300,10 @@ class FiltersMixin:
 
         # Reset button
         reset_btn = Gtk.Button(label="Reset Semua Filter")
-        reset_btn.connect("clicked", lambda *_: self._reset_filters())
+        reset_btn.connect("clicked", lambda *_: self._reset_filters(target))
         box.append(reset_btn)
 
-        self.filters_popover.set_child(box)
+        target.set_child(box)
 
     def _on_filter_changed(self, prop, val, label, name):
         try:
@@ -441,7 +420,7 @@ class FiltersMixin:
         finally:
             self._is_syncing_eq_ui = False
 
-    def _set_audio_filter(self, preset):
+    def _set_audio_filter(self, preset, popover=None):
         # Backward compatibility handler untuk UI popover / inspector lama
         if preset == "bassboost":
             self._set_audio_eq_preset("bass_boost")
@@ -451,7 +430,9 @@ class FiltersMixin:
             self._set_audio_special_effect("nightmode")
         elif preset == "reset":
             self._reset_audio_eq()
-        if hasattr(self, "filters_popover"):
+        if popover is not None:
+            popover.popdown()
+        elif hasattr(self, "filters_popover"):
             self.filters_popover.popdown()
 
     def _reset_audio_eq(self):
@@ -464,7 +445,7 @@ class FiltersMixin:
         self._sync_eq_sliders_ui()
         self.show_toast("Equalizer & Efek Audio Direset")
 
-    def _reset_filters(self):
+    def _reset_filters(self, popover=None):
         try:
             self.player.brightness = 0
             self.player.contrast = 0
@@ -473,5 +454,5 @@ class FiltersMixin:
         except Exception:
             pass
         self._reset_audio_eq()
-        self._rebuild_filters_menu()
+        self._rebuild_filters_menu(popover)
 

@@ -60,7 +60,8 @@ from .shortcuts_mixin import ShortcutsMixin
 from .window_mixin import WindowMixin
 from .prefs_mixin import PrefsMixin
 from .audio_device_mixin import AudioDeviceMixin
-from .theme import _apply_iina_css
+from .theme import _apply_iina_css  # noqa: F401  (dipertahankan untuk kompatibilitas)
+from .theme_manager import ThemeManager
 
 __all__ = ["PlayerWindow", "MpvGLArea"]
 
@@ -129,7 +130,9 @@ class PlayerWindow(
         # State Floating OSD auto-hide
         self._osd_hide_timeout_id = None
 
-        _apply_iina_css()
+        # ThemeManager memasang satu CssProvider dan memuat ulang saat tema berubah.
+        self.theme_manager = ThemeManager(self._config)
+        self.theme_manager.set_window(self)
         self._build_ui()
         self._connect_signals()
         self._setup_drag_and_drop()
@@ -175,6 +178,8 @@ class PlayerWindow(
         except Exception:
             pass
         self.mpris.unpublish()
+        if self.theme_manager is not None:
+            self.theme_manager.shutdown()
         self.gl_area.shutdown_player()
         return False
 

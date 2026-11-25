@@ -191,16 +191,17 @@ class PlaybackMixin:
         if self.is_fullscreen():
             self.unfullscreen()
             if not self._is_mini:
-                self.header.set_visible(True)
+                self.header_ctrl.show_header()
         else:
             self.fullscreen()
-            self.header.set_visible(False)
+            self.header_ctrl.hide_header()
 
     def on_mini_toggled(self, button):
         self._is_mini = button.get_active()
+        self.osc.set_mini(self._is_mini)
         if self._is_mini:
             self._normal_size = (self.get_width(), self.get_height())
-            self.header.set_visible(False)
+            self.header_ctrl.hide_header()
             if hasattr(self, "dock_layout"):
                 self.dock_layout.set_suppressed(True)
             else:
@@ -211,7 +212,7 @@ class PlaybackMixin:
             self.osd_box.set_visible(True)
             self.osd_box.remove_css_class("hidden")
         else:
-            self.header.set_visible(True)
+            self.header_ctrl.show_header()
             self.set_default_size(*self._normal_size)
             self._set_always_on_top(False)
             if hasattr(self, "dock_layout"):
@@ -303,10 +304,10 @@ class PlaybackMixin:
             pass
         return True
 
-    def _set_speed(self, speed):
+    def _set_speed(self, speed, popover=None):
         self.player.speed = speed
         self.playback_opts_btn.set_label(format_speed(speed))
-        self.playback_opts_popover.popdown()
+        (popover or self.playback_opts_popover).popdown()
 
     def change_speed(self, delta):
         current = round(self.player.speed or 1.0, 2)
@@ -314,7 +315,7 @@ class PlaybackMixin:
         self.player.speed = new_speed
         self.playback_opts_btn.set_label(format_speed(new_speed))
 
-    def toggle_ab_loop(self):
+    def toggle_ab_loop(self, popover=None):
         if self._ab_state == 0:
             pos = self.player.time_pos or 0
             self.player["ab-loop-a"] = pos
@@ -329,7 +330,7 @@ class PlaybackMixin:
             self.ab_label.set_text(f"[Loop: {_format_time(a_pos)} ⟲ {_format_time(pos)}]")
         else:
             self._reset_ab_loop()
-        self.playback_opts_popover.popdown()
+        (popover or self.playback_opts_popover).popdown()
 
     def _fit_window_to_video(self):
         if not self._config.get("fit_window", True):
@@ -352,7 +353,7 @@ class PlaybackMixin:
             max_h = int((geo.height if geo else 900) * 0.85)
         except Exception:
             max_w, max_h = 1600, 900
-        chrome_h = 48 if self.header.get_visible() else 0
+        chrome_h = self.header_ctrl.chrome_height() + self.osc.extra_height()
         extra_w = 0
         dock_layout = getattr(self, "dock_layout", None)
         if dock_layout is not None:
@@ -387,14 +388,15 @@ class PlaybackMixin:
         except Exception:
             pass
 
-    def _seek_chapter(self, index):
+    def _seek_chapter(self, index, popover=None):
         try:
             self.player.chapter = index
         except Exception:
             pass
-        self.chapter_popover.popdown()
+        (popover or self.chapter_popover).popdown()
 
-    def _rebuild_chapter_menu(self):
+    def _rebuild_chapter_menu(self, popover=None):
+        target = popover or self.chapter_popover
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.set_margin_start(8)
         box.set_margin_end(8)
@@ -417,14 +419,15 @@ class PlaybackMixin:
                 title = ch.get("title") or f"Bab {idx + 1}"
                 time_str = _format_time(ch.get("time", 0))
                 btn = Gtk.Button(label=f"{idx + 1}. {title} ({time_str})")
-                btn.connect("clicked", lambda b, i=idx: self._seek_chapter(i))
+                btn.connect("clicked", lambda b, i=idx: self._seek_chapter(i, target))
                 list_box.append(btn)
             scroll.set_child(list_box)
             box.append(scroll)
 
-        self.chapter_popover.set_child(box)
+        target.set_child(box)
 
-    def _rebuild_playback_menu(self):
+    def _rebuild_playback_menu(self, popover=None):
+        target = popover or self.playback_opts_popover
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_margin_start(10)
         box.set_margin_end(10)
@@ -446,7 +449,7 @@ class PlaybackMixin:
             btn = Gtk.Button(label=f"{s}x")
             if abs(current_speed - s) < 0.05:
                 btn.add_css_class("suggested-action")
-            btn.connect("clicked", lambda b, val=s: self._set_speed(val))
+            btn.connect("clicked", lambda b, val=s: self._set_speed(val, target))
             grid.attach(btn, i % 3, i // 3, 1, 1)
         box.append(grid)
 
@@ -462,7 +465,7 @@ class PlaybackMixin:
 
         ab_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         btn_toggle_ab = Gtk.Button(label="Langkah Loop (l)")
-        btn_toggle_ab.connect("clicked", lambda *_: self.toggle_ab_loop())
+        btn_toggle_ab.connect("clicked", lambda *_: self.toggle_ab_loop(target))
         ab_box.append(btn_toggle_ab)
 
         btn_clear_ab = Gtk.Button(label="Reset Loop")
@@ -470,5 +473,5 @@ class PlaybackMixin:
         ab_box.append(btn_clear_ab)
         box.append(ab_box)
 
-        self.playback_opts_popover.set_child(box)
+        target.set_child(box)
 

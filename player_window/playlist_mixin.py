@@ -11,6 +11,7 @@ from media_uri import is_allowed_media_uri, is_local_media_file, normalize_media
 from playlist_nav import next_playlist_index
 
 from .common import _save_config
+from .file_dialogs import pick_files, pick_save_path
 from .media_types import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 
 
@@ -310,64 +311,28 @@ class PlaylistMixin:
         self.show_toast(f"Memuat {len(entries)} trek dari playlist")
 
     def _open_m3u_dialog(self, _button=None):
-        dialog = Gtk.FileChooserDialog(
-            title="Buka Playlist M3U",
-            transient_for=self,
-            action=Gtk.FileChooserAction.OPEN,
+        pick_files(
+            self,
+            "Buka Playlist M3U",
+            lambda paths: self.load_m3u_file(paths[0]),
+            patterns=("*.m3u", "*.m3u8"),
+            pattern_name="Playlist (*.m3u, *.m3u8)",
         )
-        dialog.add_buttons(
-            "_Batal", Gtk.ResponseType.CANCEL,
-            "_Buka", Gtk.ResponseType.OK,
-        )
-        f_filter = Gtk.FileFilter()
-        f_filter.set_name("Playlist (*.m3u, *.m3u8)")
-        f_filter.add_pattern("*.m3u")
-        f_filter.add_pattern("*.m3u8")
-        dialog.add_filter(f_filter)
-
-        def on_response(dlg, resp):
-            if resp == Gtk.ResponseType.OK:
-                gfile = dlg.get_file()
-                if gfile:
-                    path = gfile.get_path()
-                    if path:
-                        self.load_m3u_file(path)
-            dlg.destroy()
-
-        dialog.connect("response", on_response)
-        dialog.show()
 
     def _export_m3u_dialog(self, _button=None):
         if not self.playlist:
             self.show_toast("Playlist saat ini kosong")
             return
-        dialog = Gtk.FileChooserDialog(
-            title="Simpan Playlist M3U",
-            transient_for=self,
-            action=Gtk.FileChooserAction.SAVE,
-        )
-        dialog.add_buttons(
-            "_Batal", Gtk.ResponseType.CANCEL,
-            "_Simpan", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_name("playlist.m3u")
 
-        def on_response(dlg, resp):
-            if resp == Gtk.ResponseType.OK:
-                gfile = dlg.get_file()
-                if gfile:
-                    path = gfile.get_path()
-                    if path:
-                        if not path.endswith(".m3u") and not path.endswith(".m3u8"):
-                            path += ".m3u"
-                        if export_m3u(path, self.playlist):
-                            self.show_toast("Playlist berhasil disimpan")
-                        else:
-                            self.show_toast("Gagal menyimpan playlist")
-            dlg.destroy()
+        def on_path(path):
+            if not path.endswith(".m3u") and not path.endswith(".m3u8"):
+                path += ".m3u"
+            if export_m3u(path, self.playlist):
+                self.show_toast("Playlist berhasil disimpan")
+            else:
+                self.show_toast("Gagal menyimpan playlist")
 
-        dialog.connect("response", on_response)
-        dialog.show()
+        pick_save_path(self, "Simpan Playlist M3U", on_path, initial_name="playlist.m3u")
 
     def _clear_playlist(self, _button=None):
         self.playlist = []

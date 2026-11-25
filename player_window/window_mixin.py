@@ -9,6 +9,7 @@ from media_uri import is_allowed_media_uri
 from plugin_loader import load_plugins
 
 from .common import PLUGINS_DIR
+from .file_dialogs import pick_files
 from .media_types import AUDIO_EXTENSIONS
 
 
@@ -107,127 +108,154 @@ class WindowMixin:
         self._rebuild_video_context_menu()
         self.video_context_popover.popup()
 
+    # -- menu klik kanan --------------------------------------------------
+    def _context_section(self, box, title):
+        lbl = Gtk.Label(label=title)
+        lbl.set_xalign(0)
+        lbl.set_margin_top(8)
+        lbl.add_css_class("dim-label")
+        box.append(lbl)
+
+    def _context_item(self, box, label, icon, handler):
+        btn = Gtk.Button()
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.append(Gtk.Image.new_from_icon_name(icon))
+        lbl = Gtk.Label(label=label)
+        lbl.set_xalign(0)
+        row.append(lbl)
+        btn.set_child(row)
+        btn.connect("clicked", handler)
+        box.append(btn)
+        return btn
+
+    def _context_submenu(self, box, label, icon, rebuild):
+        """Baris menu yang membuka popover berisi menu header (Bab/Filter/Track/Speed).
+
+        Dipakai agar aksi yang biasanya hanya ada di header tetap terjangkau saat
+        header dalam mode `auto-hide` (tersembunyi) atau `hidden`.
+        """
+        popover = Gtk.Popover()
+        btn = Gtk.MenuButton()
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.append(Gtk.Image.new_from_icon_name(icon))
+        lbl = Gtk.Label(label=label)
+        lbl.set_xalign(0)
+        lbl.set_hexpand(True)
+        row.append(lbl)
+        row.append(Gtk.Image.new_from_icon_name("go-next-symbolic"))
+        btn.set_child(row)
+        btn.set_popover(popover)
+        popover.connect("show", lambda *_: rebuild(popover))
+        popover.connect("closed", lambda *_: self.video_context_popover.popdown())
+        box.append(btn)
+        return btn
+
     def _rebuild_video_context_menu(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.set_margin_start(6)
-        box.set_margin_end(6)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        content.set_margin_start(6)
+        content.set_margin_end(6)
+        content.set_margin_top(6)
+        content.set_margin_bottom(6)
 
-        # Mini Player toggle
-        if self._is_mini:
-            mini_label = "Kembali ke Ukuran Normal (Esc)"
-            mini_icon = "view-restore-symbolic"
-        else:
-            mini_label = "Mode Mini Player"
-            mini_icon = "view-restore-symbolic"
+        close = lambda *_: self.video_context_popover.popdown()  # noqa: E731
 
-        btn_mini = Gtk.Button(label=mini_label)
-        btn_mini.set_icon_name(mini_icon)
-        def toggle_mini_action(_):
-            self.video_context_popover.popdown()
-            self.mini_btn.set_active(not self._is_mini)
-        btn_mini.connect("clicked", toggle_mini_action)
-        box.append(btn_mini)
+        # --- Berkas: aksi yang biasanya hanya di header bar ---
+        self._context_section(content, "Berkas")
+        self._context_item(content, "Buka File...", "document-open-symbolic",
+                           lambda *_: (close(), self.on_open_clicked(None)))
+        self._context_item(content, "Buka dari URL...", "insert-link-symbolic",
+                           lambda *_: (close(), self.on_open_url_clicked(None)))
+        self._context_item(content, "Riwayat Pemutaran (Ctrl+H)", "document-open-recent-symbolic",
+                           lambda *_: (close(), self.open_history_dialog(None)))
+        playlist_active = self.playlist_toggle.get_active() if hasattr(self, "playlist_toggle") else False
+        self._context_item(
+            content,
+            "Sembunyikan Playlist" if playlist_active else "Tampilkan Playlist",
+            "view-list-symbolic",
+            lambda *_: (close(), self.playlist_toggle.set_active(not playlist_active)),
+        )
+        self._context_submenu(content, "Bab / Chapters", "media-playlist-consecutive-symbolic",
+                              self._rebuild_chapter_menu)
 
-        # Inspector Panel toggle
+        # --- Tampilan ---
+        self._context_section(content, "Tampilan")
+        mini_label = "Kembali ke Ukuran Normal (Esc)" if self._is_mini else "Mode Mini Player"
+        self._context_item(content, mini_label, "view-restore-symbolic",
+                           lambda *_: (close(), self.mini_btn.set_active(not self._is_mini)))
+        music_active = self.music_toggle_btn.get_active() if hasattr(self, "music_toggle_btn") else False
+        self._context_item(
+            content,
+            "Matikan Music Mode" if music_active else "Music Mode",
+            "audio-x-generic-symbolic",
+            lambda *_: (close(), self.music_toggle_btn.set_active(not music_active)),
+        )
         if not self._is_mini:
-            insp_label = "Sembunyikan Inspector (i)" if self.inspector_panel.get_visible() else "Inspector Pengaturan (i)"
-            btn_insp = Gtk.Button(label=insp_label)
-            btn_insp.set_icon_name("preferences-other-symbolic")
-            def toggle_insp_action(_):
-                self.video_context_popover.popdown()
-                self.inspector_btn.set_active(not self.inspector_btn.get_active())
-            btn_insp.connect("clicked", toggle_insp_action)
-            box.append(btn_insp)
-
-        # Layar Penuh
+            insp_visible = self.inspector_panel.get_visible()
+            self._context_item(
+                content,
+                "Sembunyikan Inspector (i)" if insp_visible else "Inspector Pengaturan (i)",
+                "preferences-other-symbolic",
+                lambda *_: (close(), self.inspector_btn.set_active(not insp_visible)),
+            )
+        self._context_submenu(content, "Filter Video & Equalizer", "camera-photo-symbolic",
+                              self._rebuild_filters_menu)
+        self._context_submenu(content, "Audio & Subtitle", "preferences-desktop-locale-symbolic",
+                              self._rebuild_track_menu)
+        self._context_submenu(content, "Kecepatan & A-B Loop", "media-playlist-repeat-symbolic",
+                              self._rebuild_playback_menu)
         if not self._is_mini:
             fs_label = "Keluar Layar Penuh (f / Esc)" if self.is_fullscreen() else "Layar Penuh (f)"
-            btn_fs = Gtk.Button(label=fs_label)
-            btn_fs.set_icon_name("view-fullscreen-symbolic")
-            def toggle_fs_action(_):
-                self.video_context_popover.popdown()
-                self.on_fullscreen_clicked(None)
-            btn_fs.connect("clicked", toggle_fs_action)
-            box.append(btn_fs)
+            self._context_item(content, fs_label, "view-fullscreen-symbolic",
+                               lambda *_: (close(), self.on_fullscreen_clicked(None)))
 
-        # Putar / Jeda
+        # --- Pemutaran ---
+        self._context_section(content, "Pemutaran")
         is_playing = not self.player.pause
-        play_label = "Jeda (Spasi)" if is_playing else "Putar (Spasi)"
-        play_icon = "media-playback-pause-symbolic" if is_playing else "media-playback-start-symbolic"
-        btn_play = Gtk.Button(label=play_label)
-        btn_play.set_icon_name(play_icon)
-        def toggle_play_action(_):
-            self.video_context_popover.popdown()
-            self.on_playpause_clicked(None)
-        btn_play.connect("clicked", toggle_play_action)
-        box.append(btn_play)
-
-        btn_loop = Gtk.Button(label={"off": "Ulangi: Mati", "all": "Ulangi: Semua", "one": "Ulangi: Satu"}.get(self._loop_mode, "Ulangi"))
-        btn_loop.set_icon_name("media-playlist-repeat-symbolic")
-        def loop_action(_):
-            self.video_context_popover.popdown()
-            self.cycle_loop_mode()
-        btn_loop.connect("clicked", loop_action)
-        box.append(btn_loop)
-
-        btn_shuffle = Gtk.Button(label="Acak: Aktif" if self._shuffle else "Acak: Mati")
-        btn_shuffle.set_icon_name("media-playlist-shuffle-symbolic")
-        def shuffle_action(_):
-            self.video_context_popover.popdown()
-            self._set_shuffle(not self._shuffle, from_ui=True)
-        btn_shuffle.connect("clicked", shuffle_action)
-        box.append(btn_shuffle)
-
-        btn_hist = Gtk.Button(label="Riwayat Pemutaran (Ctrl+H)")
-        btn_hist.set_icon_name("document-open-recent-symbolic")
-        def hist_action(_):
-            self.video_context_popover.popdown()
-            self.open_history_dialog()
-        btn_hist.connect("clicked", hist_action)
-        box.append(btn_hist)
-
-        btn_prefs = Gtk.Button(label="Pengaturan (Ctrl+P)")
-        btn_prefs.set_icon_name("preferences-system-symbolic")
-        def prefs_action(_):
-            self.video_context_popover.popdown()
-            self.open_preferences()
-        btn_prefs.connect("clicked", prefs_action)
-        box.append(btn_prefs)
-
-        # Bisu / Suara
+        self._context_item(
+            content,
+            "Jeda (Spasi)" if is_playing else "Putar (Spasi)",
+            "media-playback-pause-symbolic" if is_playing else "media-playback-start-symbolic",
+            lambda *_: (close(), self.on_playpause_clicked(None)),
+        )
+        self._context_item(
+            content,
+            {"off": "Ulangi: Mati", "all": "Ulangi: Semua", "one": "Ulangi: Satu"}.get(self._loop_mode, "Ulangi"),
+            "media-playlist-repeat-symbolic",
+            lambda *_: (close(), self.cycle_loop_mode()),
+        )
+        self._context_item(
+            content,
+            "Acak: Aktif" if self._shuffle else "Acak: Mati",
+            "media-playlist-shuffle-symbolic",
+            lambda *_: (close(), self._set_shuffle(not self._shuffle, from_ui=True)),
+        )
         is_muted = self.player.mute
-        mute_label = "Aktifkan Suara (m)" if is_muted else "Bisu (m)"
-        mute_icon = "audio-volume-muted-symbolic" if is_muted else "audio-volume-high-symbolic"
-        btn_mute = Gtk.Button(label=mute_label)
-        btn_mute.set_icon_name(mute_icon)
-        def toggle_mute_action(_):
-            self.video_context_popover.popdown()
-            self.on_mute_clicked(None)
-        btn_mute.connect("clicked", toggle_mute_action)
-        box.append(btn_mute)
+        self._context_item(
+            content,
+            "Aktifkan Suara (m)" if is_muted else "Bisu (m)",
+            "audio-volume-muted-symbolic" if is_muted else "audio-volume-high-symbolic",
+            lambda *_: (close(), self.on_mute_clicked(None)),
+        )
 
-        # Cuplikan Layar (Screenshot)
-        btn_shot = Gtk.Button(label="Ambil Cuplikan Gambar (s)")
-        btn_shot.set_icon_name("camera-photo-symbolic")
-        def shot_action(_):
-            self.video_context_popover.popdown()
-            self.take_screenshot()
-        btn_shot.connect("clicked", shot_action)
-        box.append(btn_shot)
-
-        # Pisahkan Window Video (Detach Picture-in-Picture)
+        # --- Lain-lain ---
+        self._context_section(content, "Lain-lain")
+        self._context_item(content, "Ambil Cuplikan Gambar (s)", "camera-photo-symbolic",
+                           lambda *_: (close(), self.take_screenshot()))
         if not self._is_mini:
-            btn_detach = Gtk.Button(label="Pisahkan Window Video (Detach)")
-            btn_detach.set_icon_name("window-new-symbolic")
-            def detach_action(_):
-                self.video_context_popover.popdown()
-                self.detach_video_window()
-            btn_detach.connect("clicked", detach_action)
-            box.append(btn_detach)
+            self._context_item(content, "Pisahkan Window Video (Detach)", "window-new-symbolic",
+                               lambda *_: (close(), self.detach_video_window()))
+        self._context_item(content, "Sunting Pintasan Keyboard (Ctrl+,)", "preferences-desktop-keyboard-symbolic",
+                           lambda *_: (close(), self.open_shortcuts_editor(None)))
+        self._context_item(content, "Pengaturan (Ctrl+P)", "preferences-system-symbolic",
+                           lambda *_: (close(), self.open_preferences(None)))
 
-        self.video_context_popover.set_child(box)
+        # Menu bisa panjang; batasi tinggi dan biarkan bergulir.
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_max_content_height(520)
+        scroll.set_propagate_natural_height(True)
+        scroll.set_child(content)
+        self.video_context_popover.set_child(scroll)
 
     def on_open_url_clicked(self, button):
         dialog = Gtk.Dialog(
@@ -274,28 +302,15 @@ class WindowMixin:
         dialog.destroy()
 
     def on_open_clicked(self, button):
-        dialog = Gtk.FileChooserDialog(
-            title="Pilih video atau musik",
-            transient_for=self,
-            action=Gtk.FileChooserAction.OPEN,
-        )
-        dialog.add_buttons(
-            "_Batal", Gtk.ResponseType.CANCEL,
-            "_Buka", Gtk.ResponseType.OK,
-        )
-        dialog.set_select_multiple(True)
-        dialog.connect("response", self._on_open_dialog_response)
-        dialog.show()
+        # Bukan Gtk.FileChooserDialog: itu meng-abort proses di sebagian lingkungan
+        # (lihat player_window/file_dialogs.py).
+        pick_files(self, "Pilih video atau musik", self._on_files_chosen, multiple=True)
 
-    def _on_open_dialog_response(self, dialog, response):
-        if response == Gtk.ResponseType.OK:
-            files = dialog.get_files()
-            paths = [files.get_item(i).get_path() for i in range(files.get_n_items())]
-            for p in paths:
-                self.add_to_playlist(p)
-            if paths:
-                self.open_file(paths[0])
-        dialog.destroy()
+    def _on_files_chosen(self, paths):
+        for p in paths:
+            self.add_to_playlist(p)
+        if paths:
+            self.open_file(paths[0])
 
     def _load_plugins(self):
         enabled = self._config.get("enabled_plugins") or []

@@ -7,6 +7,7 @@ Jalankan dengan Python yang cocok dengan PyGObject sistem, mis. `python3 -m pyte
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -49,9 +50,25 @@ def result(tmp_path_factory):
     if shutil.which("dbus-run-session"):
         cmd = ["dbus-run-session", "--"] + cmd
 
-    proc = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=70)
-    lines = [l for l in proc.stdout.splitlines() if l.startswith("RESULT ")]
-    assert lines, f"aplikasi smoke tidak menghasilkan RESULT.\nstdout:\n{proc.stdout[-1500:]}\nstderr:\n{proc.stderr[-1500:]}"
+    # Output ke file, bukan pipe: dbus-run-session menjalankan layanan latar (portal, kwallet,
+    # gvfs) yang tetap hidup setelah aplikasi selesai dan menahan pipe, sehingga
+    # subprocess.run(capture_output=True) menggantung sampai timeout.
+    log_path = Path(str(home)) / "smoke_output.txt"
+    with open(log_path, "w") as log:
+        proc = subprocess.Popen(
+            cmd, env=env, stdout=log, stderr=subprocess.STDOUT, text=True, start_new_session=True
+        )
+        try:
+            proc.wait(timeout=70)
+        finally:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)  # bersihkan layanan latar yang tersisa
+            except (ProcessLookupError, PermissionError):
+                pass
+            proc.wait()
+    output = log_path.read_text(errors="replace")
+    lines = [l for l in output.splitlines() if l.startswith("RESULT ")]
+    assert lines, f"aplikasi smoke tidak menghasilkan RESULT.\noutput:\n{output[-3000:]}"
     data = json.loads(lines[-1][len("RESULT "):])
     data["_home"] = str(home)
     data["_video"] = str(media / "movie.mp4")

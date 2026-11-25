@@ -3,7 +3,9 @@ from gi.repository import Gdk, Gio, Gtk, Pango
 
 from fmt import format_speed
 
+from .chrome import OscController
 from .gl_area import MpvGLArea
+from .header import HeaderController
 from .layout import DockLayout
 import audio_filters
 
@@ -13,7 +15,47 @@ class UIBuilderMixin:
 
     def _build_ui(self):
         self.header = Gtk.HeaderBar()
+        # Tombol jendela (minimize/maximize/close) selalu tampil: di KDE/Wayland
+        # layout dekorasi bawaan sistem kadang kosong sehingga tombol hilang.
+        self.header.set_show_title_buttons(True)
+        self.header.set_decoration_layout("icon:minimize,maximize,close")
+        # Judul panjang (nama file) tidak boleh melebarkan jendela sampai tombol
+        # minimize/maximize/close terdorong keluar layar: pakai label yang dipotong (...).
+        from gi.repository import GObject
+        title_label = Gtk.Label()
+        title_label.set_ellipsize(Pango.EllipsizeMode.END)
+        title_label.set_single_line_mode(True)
+        title_label.set_width_chars(10)
+        title_label.add_css_class("title")
+        self.bind_property("title", title_label, "label", GObject.BindingFlags.SYNC_CREATE)
+        self.header.set_title_widget(title_label)
         self.set_titlebar(self.header)
+        # Mode header (full/auto-hide/hidden) dari layout v2. Mode hidden memakai
+        # titlebar transparan sendiri; header asli disimpan untuk dipasang kembali.
+        self.header_ctrl = HeaderController(self, self._config, self.header)
+
+        # Saat fullscreen GTK menyembunyikan tombol jendela bawaan, padahal header
+        # bisa muncul lagi saat kursor digeser. Sediakan tombol sendiri (hanya
+        # tampil saat fullscreen); pack_end pertama = paling kanan.
+        self._fs_window_btns = []
+        for icon, tip, handler in (
+            ("window-close-symbolic", "Tutup", lambda *_: self.close()),
+            ("view-restore-symbolic", "Keluar layar penuh", lambda *_: self.on_fullscreen_clicked(None)),
+            ("window-minimize-symbolic", "Minimalkan", lambda *_: self.minimize()),
+        ):
+            fs_btn = Gtk.Button.new_from_icon_name(icon)
+            fs_btn.set_tooltip_text(tip)
+            fs_btn.set_visible(False)
+            fs_btn.connect("clicked", handler)
+            self.header.pack_end(fs_btn)
+            self._fs_window_btns.append(fs_btn)
+
+        def _sync_fs_btns(*_):
+            fs = self.is_fullscreen()
+            for b in self._fs_window_btns:
+                b.set_visible(fs)
+
+        self.connect("notify::fullscreened", _sync_fs_btns)
 
         open_btn = Gtk.Button.new_from_icon_name("document-open-symbolic")
         open_btn.set_tooltip_text("Buka file video/audio")
@@ -161,6 +203,7 @@ class UIBuilderMixin:
         self.display_stack = Gtk.Stack()
         self.display_stack.set_hexpand(True)
         self.display_stack.set_vexpand(True)
+        self.display_stack.set_hhomogeneous(False)  # lebar minimum hanya dari halaman yang tampil
         self.display_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
 
         # Page 1: Video GLArea
@@ -352,7 +395,7 @@ class UIBuilderMixin:
         btn_row.append(screenshot_btn)
 
         self.osd_box.append(btn_row)
-        self.video_overlay.add_overlay(self.osd_box)
+        # osd_box dipasang oleh OscController (overlay bila floating, slot bila docked).
 
         # Toast notification OSD (Cuplikan layar, bookmark, dll.)
         self.toast_label = Gtk.Label(label="")
@@ -367,9 +410,25 @@ class UIBuilderMixin:
         self.inspector_panel = self._build_inspector_panel()
         self.inspector_panel.set_visible(False)
 
+        # Area tengah: [slot OSC atas, video, slot OSC bawah]. Hanya osd_box yang
+        # berpindah antara overlay dan slot; gl_area tetap di tempatnya.
+        self.osc_slot_top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.osc_slot_bottom = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.center_box.set_hexpand(True)
+        self.center_box.set_vexpand(True)
+        self.center_box.append(self.osc_slot_top)
+        self.center_box.append(self.video_overlay)
+        self.center_box.append(self.osc_slot_bottom)
+        self.osc = OscController(
+            self, self._config, self.osd_box, self.video_overlay,
+            self.osc_slot_top, self.osc_slot_bottom,
+        )
+        self.connect("notify::fullscreened", lambda *_: self.osc.set_fullscreen(self.is_fullscreen()))
+
         # Susun sidebar + video + inspector sebagai rantai Gtk.Paned.
         self.dock_layout = DockLayout(
-            self, self._config, self.sidebar, self.inspector_panel, self.video_overlay
+            self, self._config, self.sidebar, self.inspector_panel, self.center_box
         )
 
         # Key controller
@@ -392,10 +451,16 @@ class UIBuilderMixin:
 
         self.music_title = Gtk.Label(label="Tidak Ada Musik Diputar")
         self.music_title.add_css_class("title-1")
+        # Gtk.Stack meminta lebar minimum = halaman terlebar (walau tersembunyi), jadi
+        # nama file panjang di sini melebarkan jendela melebihi layar. Potong dengan "...".
+        self.music_title.set_ellipsize(Pango.EllipsizeMode.END)
+        self.music_title.set_max_width_chars(40)
         box.append(self.music_title)
 
         self.music_artist = Gtk.Label(label="—")
         self.music_artist.add_css_class("dim-label")
+        self.music_artist.set_ellipsize(Pango.EllipsizeMode.END)
+        self.music_artist.set_max_width_chars(48)
         box.append(self.music_artist)
 
         return box

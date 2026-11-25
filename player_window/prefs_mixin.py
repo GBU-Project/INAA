@@ -1,6 +1,12 @@
 from gi.repository import Gtk
 
-from layout_config import LayoutState, default_layout, sanitize_layout
+from layout_config import (
+    LayoutState,
+    apply_preset,
+    default_layout,
+    detect_preset,
+    sanitize_layout,
+)
 
 from .common import PLUGINS_DIR
 
@@ -138,7 +144,11 @@ class PrefsMixin:
         if first_row:
             cat_list.select_row(first_row)
 
-        dialog.connect("response", lambda d, r: d.destroy())
+        def on_response(d, _r):
+            self._layout_widgets = {}  # widget halaman Layout ikut hancur bersama dialog
+            d.destroy()
+
+        dialog.connect("response", on_response)
         dialog.show()
 
     # ========================================================
@@ -298,6 +308,10 @@ class PrefsMixin:
         title.add_css_class("iina-prefs-header-title")
         box.append(title)
 
+        # Widget yang nilainya harus ikut berubah saat preset/reset diterapkan.
+        self._layout_widgets = {}
+        self._layout_ui_busy = False
+
         box.append(self._prefs_section_title("Dockable Layout (v2)"))
         card0 = self._prefs_card()
         card0.append(self._prefs_switch_row(
@@ -308,6 +322,8 @@ class PrefsMixin:
             on_change=self._on_layout_v2_changed,
         ))
         box.append(card0)
+
+        self._layout_appearance_sections(box)
 
         box.append(self._prefs_section_title("Dock Playlist"))
         box.append(self._layout_dock_card("playlist", "Playlist"))
@@ -326,6 +342,206 @@ class PrefsMixin:
         reset_row.append(reset_btn)
         box.append(reset_row)
         return box
+
+    # ------------------------------------------------------------------
+    # Preset, OSC, header, tema (Phase 2.4)
+    # ------------------------------------------------------------------
+    _PRESET_CHOICES = (
+        ("classic", "Classic"), ("compact", "Compact"), ("cinema", "Cinema"),
+        ("music", "Music"), ("custom", "Custom"),
+    )
+
+    def _layout_choice_row(self, title, path, choices, on_pick, subtitle=None):
+        """Baris dropdown; `choices` = [(id, label)]. Terdaftar agar ikut tersinkron."""
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        row.add_css_class("iina-pref-card-row")
+        label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        label_box.set_hexpand(True)
+        lbl = Gtk.Label(label=title)
+        lbl.set_xalign(0)
+        label_box.append(lbl)
+        if subtitle:
+            sub = Gtk.Label(label=subtitle)
+            sub.set_xalign(0)
+            sub.set_wrap(True)
+            sub.add_css_class("dim-label")
+            label_box.append(sub)
+        row.append(label_box)
+
+        ids = [c[0] for c in choices]
+        dropdown = Gtk.DropDown.new_from_strings([c[1] for c in choices])
+        dropdown.set_valign(Gtk.Align.CENTER)
+        current = self._layout_value(sanitize_layout(self._config.get("layout")), path)
+        dropdown.set_selected(ids.index(current) if current in ids else 0)
+
+        def on_selected(d, _p):
+            if not self._layout_ui_busy:
+                on_pick(ids[d.get_selected()])
+
+        dropdown.connect("notify::selected", on_selected)
+        row.append(dropdown)
+        self._layout_widgets[path] = (dropdown, "dropdown", ids)
+        return row
+
+    def _layout_switch_row(self, title, path, subtitle=None):
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        row.add_css_class("iina-pref-card-row")
+        label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        label_box.set_hexpand(True)
+        lbl = Gtk.Label(label=title)
+        lbl.set_xalign(0)
+        label_box.append(lbl)
+        if subtitle:
+            sub = Gtk.Label(label=subtitle)
+            sub.set_xalign(0)
+            sub.set_wrap(True)
+            sub.add_css_class("dim-label")
+            label_box.append(sub)
+        row.append(label_box)
+        sw = Gtk.Switch()
+        sw.set_valign(Gtk.Align.CENTER)
+        sw.set_active(bool(self._layout_value(sanitize_layout(self._config.get("layout")), path)))
+
+        def on_active(w, _p):
+            if not self._layout_ui_busy:
+                self._set_layout_value(path, w.get_active())
+
+        sw.connect("notify::active", on_active)
+        row.append(sw)
+        self._layout_widgets[path] = (sw, "switch", None)
+        return row
+
+    def _layout_appearance_sections(self, box):
+        box.append(self._prefs_section_title("Preset"))
+        card = self._prefs_card()
+        card.append(self._layout_choice_row(
+            "Preset layout", ("preset",), self._PRESET_CHOICES, self._apply_layout_preset,
+            subtitle="Mengatur dock, OSC, dan header sekaligus. Tema tidak berubah. "
+                     "OSC dan header baru berlaku bila \"Aktifkan layout dock\" hidup.",
+        ))
+        box.append(card)
+
+        box.append(self._prefs_section_title("On-Screen Controller"))
+        card = self._prefs_card()
+        pick = lambda path: (lambda v: self._set_layout_value(path, v))  # noqa: E731
+        card.append(self._layout_choice_row(
+            "Mode OSC", ("osc", "mode"),
+            (("floating", "Mengambang"), ("docked", "Menempel"), ("off", "Mati")),
+            pick(("osc", "mode")),
+        ))
+        card.append(self._layout_choice_row(
+            "Posisi OSC menempel", ("osc", "position"),
+            (("bottom", "Bawah"), ("top", "Atas")), pick(("osc", "position")),
+        ))
+        card.append(self._layout_choice_row(
+            "Ukuran OSC", ("osc", "size"),
+            (("compact", "Kecil"), ("regular", "Sedang"), ("large", "Besar")),
+            pick(("osc", "size")),
+        ))
+        card.append(self._layout_switch_row(
+            "OSC selalu terlihat", ("osc", "always_visible"),
+            subtitle="Tidak disembunyikan otomatis saat kursor diam.",
+        ))
+        box.append(card)
+
+        box.append(self._prefs_section_title("Header Bar"))
+        card = self._prefs_card()
+        card.append(self._layout_choice_row(
+            "Header bar", ("headerbar",),
+            (("auto-hide", "Sembunyi otomatis"), ("full", "Selalu tampil"),
+             ("hidden", "Tersembunyi")),
+            pick(("headerbar",)),
+            subtitle="Tersembunyi: judul/tombol hilang, strip tipis di atas tetap "
+                     "bisa dipakai menggeser jendela.",
+        ))
+        box.append(card)
+
+        box.append(self._prefs_section_title("Tema"))
+        card = self._prefs_card()
+        card.append(self._layout_choice_row(
+            "Mode", ("theme", "mode"),
+            (("system", "Ikuti sistem"), ("dark", "Gelap"), ("light", "Terang")),
+            pick(("theme", "mode")),
+        ))
+        card.append(self._layout_choice_row(
+            "Palet", ("theme", "palette"),
+            (("iina-glass", "IINA Glass"), ("graphite", "Graphite"), ("light", "Terang")),
+            pick(("theme", "palette")),
+            subtitle="Mode Terang selalu memakai palet Terang.",
+        ))
+        card.append(self._layout_choice_row(
+            "Warna aksen", ("theme", "accent"),
+            (("blue", "Biru"), ("purple", "Ungu"), ("pink", "Merah muda"),
+             ("orange", "Oranye"), ("green", "Hijau"), ("graphite", "Grafit")),
+            pick(("theme", "accent")),
+        ))
+        card.append(self._layout_switch_row(
+            "Kurangi gerakan", ("reduce_motion",),
+            subtitle="Mematikan transisi dan animasi.",
+        ))
+        box.append(card)
+
+    @staticmethod
+    def _layout_value(layout, path):
+        node = layout
+        for key in path:
+            node = node[key]
+        return node
+
+    def _set_layout_value(self, path, value):
+        layout = sanitize_layout(self._config.get("layout"))
+        node = layout
+        for key in path[:-1]:
+            node = node[key]
+        node[path[-1]] = value
+        self._commit_layout(layout)
+
+    def _apply_layout_preset(self, name):
+        self._commit_layout(apply_preset(self._config.get("layout"), name), relabel=False)
+
+    def _commit_layout(self, layout, relabel=True):
+        """Simpan layout, terapkan ke jendela, dan sinkronkan widget Preferences."""
+        layout = sanitize_layout(layout)
+        if relabel:
+            layout["preset"] = detect_preset(layout)
+        self._config["layout"] = layout
+        for attr, method in (
+            ("dock_layout", "apply_config"), ("osc", "apply"),
+            ("header_ctrl", "apply"), ("theme_manager", "apply"),
+        ):
+            target = getattr(self, attr, None)
+            if target is not None:
+                getattr(target, method)()
+        self._sync_layout_widgets()
+        self._save_config_throttled(force=True)
+
+    def _sync_layout_widgets(self):
+        """Samakan widget halaman Layout dengan config (setelah preset/reset/relabel)."""
+        widgets = getattr(self, "_layout_widgets", None)
+        if not widgets:
+            return
+        layout = sanitize_layout(self._config.get("layout"))
+        self._layout_ui_busy = True
+        try:
+            for path, (widget, kind, ids) in widgets.items():
+                try:
+                    if path[-1] == "visible" and len(path) == 2:  # dock: tampil = visible & edge != hidden
+                        value = bool(layout[path[0]]["visible"]) and layout[path[0]]["edge"] != "hidden"
+                    else:
+                        value = self._layout_value(layout, path)
+                    if kind == "dropdown":
+                        if value in ids and widget.get_selected() != ids.index(value):
+                            widget.set_selected(ids.index(value))
+                    elif kind == "switch":
+                        if widget.get_active() != bool(value):
+                            widget.set_active(bool(value))
+                    elif kind == "spin":
+                        if int(widget.get_value()) != int(value):
+                            widget.set_value(int(value))
+                except Exception:
+                    pass  # widget sudah dihancurkan (dialog ditutup)
+        finally:
+            self._layout_ui_busy = False
 
     def _layout_dock_card(self, name, label):
         state = LayoutState.from_dict(self._config.get("layout"))
@@ -350,6 +566,7 @@ class PrefsMixin:
             lambda w, _p, n=name: self._update_layout_dock(n, "visible", w.get_active()),
         )
         vis_row.append(vis_sw)
+        self._layout_widgets[(name, "visible")] = (vis_sw, "switch", None)
         card.append(vis_row)
 
         # Baris sisi dock
@@ -371,6 +588,7 @@ class PrefsMixin:
             ),
         )
         edge_row.append(dropdown)
+        self._layout_widgets[(name, "edge")] = (dropdown, "dropdown", edge_ids)
         card.append(edge_row)
 
         # Baris lebar pane
@@ -388,6 +606,7 @@ class PrefsMixin:
             lambda s, n=name: self._update_layout_dock(n, "width", int(s.get_value())),
         )
         width_row.append(spin)
+        self._layout_widgets[(name, "width")] = (spin, "spin", None)
         px = Gtk.Label(label="px")
         px.add_css_class("dim-label")
         width_row.append(px)
@@ -395,6 +614,8 @@ class PrefsMixin:
         return card
 
     def _update_layout_dock(self, name, key, value):
+        if getattr(self, "_layout_ui_busy", False):
+            return  # perubahan programatis dari sinkronisasi widget
         state = LayoutState.from_dict(self._config.get("layout"))
         if key == "visible" and value and getattr(state, f"{name}_edge") == "hidden":
             default_edge = "left" if name == "playlist" else "right"
@@ -409,6 +630,8 @@ class PrefsMixin:
                 layout.set_width(name, self._config["layout"][name]["width"])
             else:
                 layout.apply_config()
+        self._config["layout"]["preset"] = detect_preset(self._config["layout"])
+        self._sync_layout_widgets()
         self._save_config_throttled(force=True)
 
     def _on_layout_v2_changed(self, enabled):
@@ -417,14 +640,16 @@ class PrefsMixin:
         layout = getattr(self, "dock_layout", None)
         if layout is not None:
             layout.apply_config()
+        osc = getattr(self, "osc", None)
+        if osc is not None:
+            osc.apply()
         self._save_config_throttled(force=True)
 
     def _reset_layout(self, _button=None):
-        self._config["layout"] = default_layout()
         layout = getattr(self, "dock_layout", None)
         if layout is not None:
             layout.reset()
-        self._save_config_throttled(force=True)
+        self._commit_layout(default_layout(), relabel=False)
 
     def _prefs_video_page(self):
         """Matches the IINA 1.5.0 Video Settings screenshot."""

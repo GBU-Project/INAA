@@ -174,7 +174,7 @@ class InputMixin:
             self._osd_hide_timeout_id = GLib.timeout_add(delay, self._hide_osd_callback)
 
     def _should_auto_hide_chrome(self):
-        if not self._config.get("auto_hide_chrome", True):
+        if not any(self.osc.chrome_auto_hide()):
             return False
         if self._is_mini or self._is_music_mode:
             return False
@@ -190,18 +190,21 @@ class InputMixin:
 
     def _reveal_chrome(self):
         self._chrome_visible = True
-        self.osd_box.set_visible(True)
-        self.osd_box.remove_css_class("hidden")
+        if self.osc.allows_osd():
+            self.osd_box.set_visible(True)
+            self.osd_box.remove_css_class("hidden")
         if not self._is_mini and not self.is_fullscreen():
-            self.header.set_visible(True)
+            self.header_ctrl.show_header()
 
     def _hide_osd_callback(self):
         if self._should_auto_hide_chrome():
+            osd_auto, header_auto = self.osc.chrome_auto_hide()
             self._chrome_visible = False
-            self.osd_box.add_css_class("hidden")
-            if not self._is_mini:
-                self.header.set_visible(False)
-            GLib.timeout_add(230, self._finish_hide_osd)
+            if header_auto and not self._is_mini:
+                self.header_ctrl.hide_header()
+            if osd_auto:
+                self.osd_box.add_css_class("hidden")
+                GLib.timeout_add(230, self._finish_hide_osd)
         self._osd_hide_timeout_id = None
         return False
 

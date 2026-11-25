@@ -169,6 +169,49 @@ def preset_layout(name: str) -> dict:
     return merged
 
 
+REAL_PRESETS = ("classic", "compact", "cinema", "music")
+
+# Field yang menentukan identitas preset. Lebar pane dan tema sengaja tidak ikut:
+# menggeser pane atau mengganti tema tidak mengubah preset menjadi "custom".
+_PRESET_KEYS = {
+    "playlist": ("edge", "visible"),
+    "inspector": ("edge", "visible"),
+    "osc": ("mode", "position", "size"),
+}
+
+
+def _preset_signature(layout: Mapping[str, Any]) -> tuple:
+    sig = [layout["headerbar"]]
+    for section, keys in _PRESET_KEYS.items():
+        sig.extend(layout[section][key] for key in keys)
+    return tuple(sig)
+
+
+def detect_preset(layout: Mapping[str, Any] | None) -> str:
+    """Nama preset yang cocok dengan layout, atau "custom"."""
+    sig = _preset_signature(sanitize_layout(layout))
+    for name in REAL_PRESETS:
+        if sig == _preset_signature(preset_layout(name)):
+            return name
+    return "custom"
+
+
+def apply_preset(layout: Mapping[str, Any] | None, name: str) -> dict:
+    """Terapkan preset ke layout; tema, reduce_motion, dan lock_aspect dipertahankan.
+
+    Nama selain preset nyata (mis. "custom") tidak mengubah apa pun selain labelnya.
+    """
+    clean = sanitize_layout(layout)
+    if name not in REAL_PRESETS:
+        clean["preset"] = detect_preset(clean)
+        return clean
+    target = preset_layout(name)
+    for key in ("playlist", "inspector", "osc", "headerbar"):
+        clean[key] = target[key]
+    clean["preset"] = name
+    return sanitize_layout(clean)
+
+
 # ---------------------------------------------------------------------------
 # Validasi
 # ---------------------------------------------------------------------------
@@ -309,6 +352,7 @@ __all__ = [
     "LAYOUT_VERSION", "CONFIG_VERSION", "EDGES", "OSC_MODES", "OSC_POSITIONS",
     "OSC_SIZES", "HEADERBAR_MODES", "THEME_MODES", "PALETTES", "ACCENTS",
     "PRESET_NAMES", "MIN_PANE_WIDTH", "MAX_PANE_WIDTH",
+    "REAL_PRESETS", "detect_preset", "apply_preset",
     "LayoutState", "default_layout", "preset_layout", "sanitize_layout",
     "layout_from_config", "migrate_layout_config", "layout_v2_enabled",
     "DOCK_NAMES", "DEFAULT_EDGES", "dock_sides",

@@ -37,7 +37,7 @@ class SubtitlesMixin:
             is_sel = (current_aid == tid) or t.get("selected")
             btn = Gtk.Button(label=f"{'✓ ' if is_sel else '   '}{name}")
             btn.add_css_class("iina-seg-btn")
-            btn.connect("clicked", lambda b, track_id=tid: self._set_track("aid", track_id))
+            btn.connect("clicked", lambda b, track_id=tid: self._set_track("aid", track_id, target))
             self.insp_audio_track_box.append(btn)
 
         # Primary Subtitle tracks
@@ -57,7 +57,7 @@ class SubtitlesMixin:
             is_sel = (current_sid == tid) or t.get("selected")
             btn = Gtk.Button(label=f"{'✓ ' if is_sel else '   '}{name}")
             btn.add_css_class("iina-seg-btn")
-            btn.connect("clicked", lambda b, track_id=tid: self._set_track("sid", track_id))
+            btn.connect("clicked", lambda b, track_id=tid: self._set_track("sid", track_id, target))
             self.insp_sub_track_box.append(btn)
 
         # Secondary Subtitle tracks (Dual Subtitle)
@@ -81,10 +81,11 @@ class SubtitlesMixin:
                 is_sel = (current_sec_sid == tid)
                 btn = Gtk.Button(label=f"{'✓ ' if is_sel else '   '}{name}")
                 btn.add_css_class("iina-seg-btn")
-                btn.connect("clicked", lambda b, track_id=tid: self._set_track("secondary_sid", track_id))
+                btn.connect("clicked", lambda b, track_id=tid: self._set_track("secondary_sid", track_id, target))
                 self.insp_sec_sub_track_box.append(btn)
 
-    def _rebuild_track_menu(self):
+    def _rebuild_track_menu(self, popover=None):
+        target = popover or self.track_popover
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.set_margin_start(8)
         box.set_margin_end(8)
@@ -109,7 +110,7 @@ class SubtitlesMixin:
             is_sel = t.get("selected") or (current_aid == tid)
             prefix = "✓ " if is_sel else "   "
             btn = Gtk.Button(label=f"{prefix}{name}")
-            btn.connect("clicked", lambda b, track_id=tid: self._set_track("aid", track_id))
+            btn.connect("clicked", lambda b, track_id=tid: self._set_track("aid", track_id, target))
             box.append(btn)
 
         sub_label = Gtk.Label(label="Subtitle Track")
@@ -121,7 +122,7 @@ class SubtitlesMixin:
         is_none_sel = (current_sid in (False, "no", None))
         none_prefix = "✓ " if is_none_sel else "   "
         none_btn = Gtk.Button(label=f"{none_prefix}Nonaktifkan Subtitle")
-        none_btn.connect("clicked", lambda b: self._set_track("sid", "no"))
+        none_btn.connect("clicked", lambda b: self._set_track("sid", "no", target))
         box.append(none_btn)
 
         for t in [t for t in tracks if t.get("type") == "sub"]:
@@ -130,7 +131,7 @@ class SubtitlesMixin:
             is_sel = t.get("selected") or (current_sid == tid)
             prefix = "✓ " if is_sel else "   "
             btn = Gtk.Button(label=f"{prefix}{name}")
-            btn.connect("clicked", lambda b, track_id=tid: self._set_track("sid", track_id))
+            btn.connect("clicked", lambda b, track_id=tid: self._set_track("sid", track_id, target))
             box.append(btn)
 
         # Online subtitle search button
@@ -147,14 +148,14 @@ class SubtitlesMixin:
         local_sub_btn.connect("clicked", self._open_local_sub_dialog)
         box.append(local_sub_btn)
 
-        self.track_popover.set_child(box)
+        target.set_child(box)
 
-    def _set_track(self, kind, value):
+    def _set_track(self, kind, value, popover=None):
         try:
             setattr(self.player, kind, value)
         except Exception:
             pass
-        self.track_popover.popdown()
+        (popover or self.track_popover).popdown()
         if hasattr(self, "inspector_panel") and self.inspector_panel.get_visible():
             self._refresh_inspector_tracks()
 
