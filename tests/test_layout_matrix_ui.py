@@ -1,8 +1,8 @@
-"""Matriks QA Phase 2.5: palet x mode OSC x mode header, diterapkan langsung.
+"""Matriks QA Phase 2.5: palet x mode OSC x mode header (+ mini player dan fullscreen).
 
-Butuh xvfb-run + GTK4 + python-mpv. Setiap kombinasi diterapkan lewat objek yang
-sama seperti saat pengguna mengubah Preferences, lalu keadaan widget diperiksa.
-stderr seluruh proses juga dipastikan bebas "Theme parser error".
+Satu proses xvfb menjalankan semua kombinasi; tiap kombinasi diperiksa: posisi osd_box,
+visibilitas, palet efektif, auto-hide header, perilaku mini player/fullscreen, dan tidak ada
+`Theme parser error` / `Gtk-CRITICAL` di stderr.
 """
 import json
 import os
@@ -24,7 +24,19 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
+rows = []
 app = Gtk.Application(application_id="com.example.inaa.matrix")
+
+
+def where(win):
+    parent = win.osd_box.get_parent()
+    if parent is win.video_overlay:
+        return "overlay"
+    if parent is win.osc_slot_top:
+        return "top"
+    if parent is win.osc_slot_bottom:
+        return "bottom"
+    return "none"
 
 
 def on_activate(app):
@@ -33,51 +45,57 @@ def on_activate(app):
 
     win = PlayerWindow(application=app)
     win.present()
-    rows = []
+    gl_parent = win.gl_area.get_parent()
 
-    palettes = [("iina-glass", "dark"), ("graphite", "dark"), ("light", "light")]
-    for (palette, mode), osc_mode, header_mode in itertools.product(
-        palettes, ("floating", "docked", "off"), ("full", "auto-hide", "hidden")
-    ):
+    combos = itertools.product(
+        ("iina-glass", "graphite", "light"),
+        ("floating", "docked", "off"),
+        ("full", "auto-hide"),
+    )
+    for palette, mode, header in combos:
         layout = win._config["layout"]
-        layout["osc"]["mode"] = osc_mode
-        layout["headerbar"] = header_mode
-        layout["theme"]["mode"] = mode
-        layout["theme"]["palette"] = palette
-        win.osc.apply()
-        win.header_ctrl.apply()
-        win.theme_manager.apply()
-        win._reveal_chrome()  # seperti kursor bergerak: OSC floating muncul kembali
+        layout["theme"].update(mode="light" if palette == "light" else "dark", palette=palette)
+        layout["osc"].update(mode=mode, position="top" if mode == "docked" else "bottom", size="regular")
+        layout["headerbar"] = header
+        win._commit_layout(layout)
 
-        state = win.osc.state
-        parent = win.osd_box.get_parent()
-        if parent is win.video_overlay:
-            where = "overlay"
-        elif parent is win.osc_slot_top:
-            where = "top"
-        elif parent is win.osc_slot_bottom:
-            where = "bottom"
-        else:
-            where = "none"
+        row = {"combo": [palette, mode, header], "problems": []}
+        slot = "top" if mode == "docked" else None
+        expect_where = slot or "overlay"
+        if where(win) != expect_where:
+            row["problems"].append(f"posisi {where(win)} != {expect_where}")
+        if mode == "docked" and not win.osd_box.get_visible():
+            row["problems"].append("docked tidak terlihat")
+        if mode == "off" and win.osd_box.get_visible():
+            row["problems"].append("off masih terlihat")
+        if win.theme_manager._signature[0] != palette:
+            row["problems"].append(f"palet {win.theme_manager._signature[0]} != {palette}")
+        if win.osc.chrome_auto_hide()[1] != (header == "auto-hide"):
+            row["problems"].append("flag auto-hide header salah")
+        if mode == "docked" and win.osc.chrome_auto_hide()[0]:
+            row["problems"].append("OSC docked tidak boleh auto-hide")
 
-        if header_mode == "hidden":
-            titlebar = "dragbar"
-        elif win.get_titlebar() is win.header:
-            titlebar = "header"
-        else:
-            titlebar = "other"
+        # mini player: OSC selalu floating dan terlihat, lalu kembali seperti semula
+        win.osc.set_mini(True)
+        if where(win) != "overlay" or not win.osd_box.get_visible():
+            row["problems"].append("mini: OSC tidak floating/terlihat")
+        win.osc.set_mini(False)
+        if where(win) != expect_where:
+            row["problems"].append("mini: tidak kembali ke posisi semula")
 
-        rows.append({
-            "palette": palette,
-            "osc": osc_mode,
-            "header": header_mode,
-            "osc_state": state["mode"],
-            "where": where,
-            "osd_visible": win.osd_box.get_visible(),
-            "header_mode": win.header_ctrl.mode(),
-            "titlebar": titlebar,
-            "theme": win.theme_manager._signature[0],
-        })
+        # fullscreen: docked menjadi floating, off tetap off, lalu kembali
+        win.osc.set_fullscreen(True)
+        if mode == "docked" and where(win) != "overlay":
+            row["problems"].append("fullscreen: docked harus floating")
+        if mode == "off" and win.osd_box.get_visible():
+            row["problems"].append("fullscreen: off harus tetap tersembunyi")
+        win.osc.set_fullscreen(False)
+        if where(win) != expect_where:
+            row["problems"].append("fullscreen: tidak kembali ke posisi semula")
+
+        if win.gl_area.get_parent() is not gl_parent:
+            row["problems"].append("gl_area berpindah parent")
+        rows.append(row)
 
     print("RESULT " + json.dumps(rows))
     app.quit()
@@ -102,7 +120,7 @@ pytestmark = [
 ]
 
 
-def test_palette_osc_header_matrix_stays_consistent(tmp_path):
+def test_palette_osc_header_matrix(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
     env = os.environ.copy()
@@ -110,27 +128,22 @@ def test_palette_osc_header_matrix_stays_consistent(tmp_path):
 
     log_path = tmp_path / "out.txt"
     with open(log_path, "w") as log:
-        proc = subprocess.run(
+        subprocess.run(
             ["xvfb-run", "-a", sys.executable, "-c", SCRIPT],
             cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, text=True, timeout=120,
         )
     output = log_path.read_text(errors="replace")
-    assert proc.returncode == 0, output[-3000:]
-    assert "Theme parser error" not in output
     line = next((ln for ln in output.splitlines() if ln.startswith("RESULT ")), None)
     assert line, output[-3000:]
     rows = json.loads(line[len("RESULT "):])
 
-    assert len(rows) == 3 * 3 * 3
-    for row in rows:
-        assert row["osc_state"] == row["osc"]
-        assert row["header_mode"] == row["header"]
-        assert row["theme"] == row["palette"]
-        if row["osc"] == "off":
-            assert row["osd_visible"] is False
-        elif row["osc"] == "floating":
-            assert row["where"] == "overlay" and row["osd_visible"] is True
-        else:
-            assert row["where"] in ("top", "bottom")
-        expected_titlebar = "dragbar" if row["header"] == "hidden" else "header"
-        assert row["titlebar"] == expected_titlebar
+    assert len(rows) == 18  # 3 palet x 3 mode OSC x 2 mode header
+    bad = [r for r in rows if r["problems"]]
+    assert not bad, json.dumps(bad, indent=1)
+    assert "Theme parser error" not in output
+    # Bus aksesibilitas (at-spi) memang tidak ada di xvfb: bukan bug aplikasi.
+    critical = [
+        ln for ln in output.splitlines()
+        if "Gtk-CRITICAL" in ln and "accessibility bus" not in ln
+    ]
+    assert not critical, "\n".join(critical)

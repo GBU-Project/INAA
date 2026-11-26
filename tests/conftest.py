@@ -9,3 +9,9 @@ import os
 import site
 
 os.environ.setdefault("PYTHONUSERBASE", site.getuserbase())
+# Crash native (segfault/abort) di subproses GUI mencetak stack Python-nya ke stderr.
+os.environ.setdefault("PYTHONFAULTHANDLER", "1")
+# Tes GUI dijalankan lewat xvfb-run, tetapi bila sesi pengembang Wayland (WAYLAND_DISPLAY ada)
+# GTK memilih Wayland dan membuka jendela sungguhan di desktop, bukan di Xvfb. Itu membuat tes
+# tidak hermetik dan memunculkan segfault acak di callback Wayland GTK. Paksa X11 (Xvfb).
+os.environ["GDK_BACKEND"] = "x11"

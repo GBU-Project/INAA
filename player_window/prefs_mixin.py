@@ -456,6 +456,15 @@ class PrefsMixin:
         ))
         box.append(card)
 
+        box.append(self._prefs_section_title("Jendela"))
+        card = self._prefs_card()
+        card.append(self._layout_switch_row(
+            "Kunci rasio jendela", ("lock_aspect",),
+            subtitle="Setelah jendela diubah ukurannya, rasio disesuaikan dengan video. "
+                     "Tidak berlaku saat maximize, layar penuh, mini player, atau music mode.",
+        ))
+        box.append(card)
+
         box.append(self._prefs_section_title("Tema"))
         card = self._prefs_card()
         card.append(self._layout_choice_row(

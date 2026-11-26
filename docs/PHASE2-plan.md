@@ -118,21 +118,37 @@ adalah rencana kerja; status tiap tahap dicatat di bagian "Status".
   `tests/test_chrome_logic.py`, `tests/test_osc_ui.py` (xvfb).
   Aktif hanya dengan `INAA_LAYOUT_V2=1`; belum ada UI untuk mengubah mode (itu tahap 2.4).
   Header belum disentuh (2.3).
-- [~] 2.3 sebagian ditulis (belum dijalankan): `resolve_header_mode`/`auto_hide_flags` di
-  `chrome_logic.py`, `OscController.chrome_auto_hide()`, `input_mixin` memisahkan auto-hide
-  OSC dan header (flag v2 mati = perilaku lama via `auto_hide_chrome`). `full` dan `auto-hide`
-  berfungsi; `hidden` sementara diperlakukan sebagai `auto-hide` sampai spike Wayland
-  (`Gtk.WindowHandle` + `Gtk.WindowControls`) membuktikan drag/resize aman.
-  Belum: menu klik kanan memuat aksi header (prasyarat `hidden`).
-- [~] 2.4 ditulis (belum dijalankan): `detect_preset`/`apply_preset` di `layout_config.py`
+- [x] 2.3 lulus di GTK (440 tes): `resolve_header_mode`/`auto_hide_flags` di `chrome_logic.py`,
+  `OscController.chrome_auto_hide()`, `input_mixin` memisahkan auto-hide OSC dan header
+  (flag v2 mati = perilaku lama via `auto_hide_chrome`). Mode `hidden` ada di
+  `player_window/header.py` (`HeaderController`: titlebar transparan 26px berisi
+  `Gtk.WindowHandle` + `Gtk.WindowControls`, tanpa `set_decorated(False)`; header asli disimpan
+  untuk dipasang kembali). Ditulis di luar sesi ini; terpasang via `ui_builder`/`input_mixin`.
+  Belum diverifikasi manual: drag/resize di Wayland nyata, dan menu klik kanan dengan aksi header.
+- Catatan tes (2026-11-26): `test_smoke.py` MPRIS gagal 4/4 karena aplikasi uji memblokir main loop
+  (`communicate`) saat klien terlambat; diperbaiki dengan menunggu non-blok. Terlihat sekali
+  `Segmentation fault` acak di `test_smoke_v3`. Jejak `faulthandler` menunjukkan crash di
+  callback Wayland GTK (`gtk_widget_get_display` pada widget kosong): tes `xvfb-run` ternyata
+  memakai Wayland sesi KDE (WAYLAND_DISPLAY diwarisi), bukan Xvfb. `tests/conftest.py` kini
+  memaksa `GDK_BACKEND=x11`; 10/10 putaran bersih sesudahnya (load mesin juga turun, jadi
+  belum bukti mutlak). Akibatnya tes tidak lagi mencakup Wayland; bug GTK/Wayland yang sama
+  mungkin bisa muncul di pemakaian nyata dan hanya bisa dicek manual (lihat checklist 2.5).
+- [x] 2.4 lulus di GTK (431 lulus pada run penuh, termasuk `test_layout_presets` dan
+  `test_prefs_layout_ui`): `detect_preset`/`apply_preset` di `layout_config.py`
   (identitas preset = edge/visible dock, mode/posisi/ukuran OSC, header; lebar, tema, reduce motion
   tidak ikut), bagian Preset/OSC/Header/Tema di halaman Layout (`prefs_mixin.py`), widget tersinkron
   saat preset/reset. Tes: `test_layout_presets.py` (murni), `test_prefs_layout_ui.py` (xvfb).
-  Belum: `lock_aspect` (ditunda), mode header `hidden`.
-- [ ] 2.5
-
-## Status Update (2026-11-25)
-- **2.3**: Selesai. Mode `hidden` headerbar diimplementasikan dengan `Gtk.WindowHandle` + `Gtk.WindowControls` (Wayland-safe, tanpa `set_decorated(False)`), dengan mekanisme reveal hover dan integrasi dragbar 26px.
-- **2.4**: Terverifikasi melalui `test_prefs_layout_ui.py`.
-- **2.5**: Automasi via `test_layout_matrix_ui.py` lulus.
-- **Catatan**: Smoke tests (`test_smoke.py`, `test_smoke_v3.py`) gagal karena isu D-Bus/MPRIS di environment Xvfb, namun logika UI header dan layout sudah terverifikasi integritasnya melalui `test_layout_matrix_ui` dan tes unit lainnya.
+  `lock_aspect` (2026-11-26, ditulis, belum dijalankan): `aspect_logic.py` (murni) +
+  `PlaybackMixin._enforce_aspect_lock()` (dipanggil dari polling; rasio dipulihkan setelah ukuran
+  stabil dua polling, tidak aktif saat maximize/fullscreen/mini/music) + saklar "Kunci rasio
+  jendela" di halaman Layout. Tes: `tests/test_aspect_logic.py`. Perlu cek manual: jendela tidak
+  "bergetar" saat ditarik, dan `set_default_size` benar-benar mengubah ukuran di Wayland.
+  Menu klik kanan sudah memuat aksi header (Berkas/Bab/Filter/Audio-Subtitle/Kecepatan/Pengaturan).
+  Modul baru `aspect_logic.py` ikut daftar `cp -r` Flatpak bila manifest ada.
+- Status run penuh (2026-11-26 13:42): 440 lulus, 0 gagal (flatpak diabaikan).
+  (Sebelumnya 08:02: 440 lulus tanpa matriks.) Perbaikan tes di
+  sesi ini: `conftest.py` (PYTHONUSERBASE, faulthandler, `GDK_BACKEND=x11`), `test_smoke.py` pakai
+  file bukan pipe, aplikasi smoke menunggu kondisi (bukan waktu tetap) dan tidak memblokir main loop.
+- [x] 2.5 otomatis lulus: `tests/test_layout_matrix_ui.py` (18 kombinasi palet x mode OSC x mode
+  header, tanpa masalah layout/parser CSS; Gtk-CRITICAL bus aksesibilitas di xvfb diabaikan).
+  Smoke test lulus (tidak gagal seperti catatan lama). Sisa: checklist manual di bawah.

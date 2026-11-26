@@ -53,7 +53,12 @@ def run(tmp_path_factory):
     proc = subprocess.run(["xvfb-run", "-a", sys.executable, str(APP), str(video)],
                           env=env, capture_output=True, text=True, timeout=70)
     lines = [l for l in proc.stdout.splitlines() if l.startswith("RESULT ")]
-    assert lines, f"tidak ada RESULT.\nstdout:\n{proc.stdout[-1500:]}\nstderr:\n{proc.stderr[-1500:]}"
+    # Bila proses crash native, tampilkan jejaknya mulai dari 'Fatal Python error' (frame teratas
+    # = lokasi crash), bukan hanya ekor stderr yang berisi main loop.
+    err = proc.stderr
+    start = err.find("Fatal Python error")
+    excerpt = err[start:start + 6000] if start >= 0 else err[-1500:]
+    assert lines, f"tidak ada RESULT.\nstdout:\n{proc.stdout[-1500:]}\nstderr:\n{excerpt}"
     data = json.loads(lines[-1][len("RESULT "):])
     data["_home"] = str(home)
     return data

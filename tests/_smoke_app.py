@@ -44,12 +44,27 @@ def on_activate(app):
     R["mpris_published"] = bool(win.mpris.is_published)
 
     def open_video():
+        state["t_open"] = time.time()
         win.open_file(video)
 
-    def check_playing_and_sub():
-        R["pos_after_open"] = win.player.time_pos
-        subs = [t for t in win.player.track_list if t.get("type") == "sub"]
-        R["external_sub"] = any(t.get("external") for t in subs)
+    def poll_playing():
+        # Tunggu pemutaran mulai dan subtitle eksternal termuat (maks 15 detik): di Xvfb/render
+        # software lebih lambat dari GPU asli, jadi waktu tetap 2 detik terlalu pendek.
+        if "t_open" not in state:
+            return True  # file belum dibuka
+        try:
+            pos = win.player.time_pos
+            subs = [t for t in win.player.track_list if t.get("type") == "sub"]
+            ext = any(t.get("external") for t in subs)
+            # pos harus sudah maju melewati ambang yang diuji (> 0.3 di test_smoke), bukan sekadar
+            # tidak None: pemutaran yang baru mulai selalu menunjukkan 0.1-0.2 detik.
+            if (pos is None or pos <= 0.6 or not ext) and time.time() - state["t_open"] < 15:
+                return True
+            R["pos_after_open"] = pos
+            R["external_sub"] = ext
+        except Exception as exc:
+            R.setdefault("errors", []).append(f"poll_playing: {exc!r}")
+        return False
 
     def check_speed_label():
         win._set_speed(1.0)
@@ -73,6 +88,7 @@ print(json.dumps(out))
         # Klien HARUS di proses lain: layanan MPRIS hidup di main loop proses ini,
         # jadi memanggilnya dari sini akan deadlock.
         if win.mpris.is_published:
+            state["t0"] = time.time()
             state["proc"] = subprocess.Popen(
                 [sys.executable, "-c", MPRIS_CLIENT], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
@@ -81,6 +97,14 @@ print(json.dumps(out))
         proc = state.get("proc")
         if proc is None:
             return
+        # Jangan memblokir main loop (communicate) saat klien belum selesai: klien butuh
+        # main loop ini untuk dijawab, jadi menunggu secara blok = deadlock bila klien lambat
+        # (mesin sibuk). Tunggu sambil membiarkan loop berjalan.
+        if proc.poll() is None:
+            if time.time() - state["t0"] < 25:
+                GLib.timeout_add(200, lambda: (step_run(mpris_collect), False)[1])
+                return
+            proc.kill()
         out, err = proc.communicate(timeout=10)
         data = json.loads(out.strip().splitlines()[-1]) if out.strip() else {}
         R["mpris_identity"] = data.get("identity")
@@ -88,6 +112,12 @@ print(json.dumps(out))
         R["mpris_status_after_play"] = data.get("after_play")
         if proc.returncode != 0:
             R.setdefault("errors", []).append(f"mpris client rc={proc.returncode}: {err[-300:]}")
+
+    def step_run(fn):
+        try:
+            fn()
+        except Exception as exc:
+            R.setdefault("errors", []).append(f"{fn.__name__}: {exc!r}")
 
     def screenshot():
         win.take_screenshot()
@@ -120,10 +150,14 @@ print(json.dumps(out))
         R["recent_saved"] = [r for r in recents if r.get("path") == video]
 
     def finish():
+        proc = state.get("proc")
+        if proc is not None and proc.poll() is None and "mpris_identity" not in R:
+            GLib.timeout_add(300, lambda: (finish(), False)[1])  # tunggu klien MPRIS selesai
+            return
         app.quit()
 
     step(500, open_video)
-    step(2000, check_playing_and_sub)
+    GLib.timeout_add(500, poll_playing)
     step(2200, check_speed_label)
     step(2500, mpris_start)
     step(4500, mpris_collect)

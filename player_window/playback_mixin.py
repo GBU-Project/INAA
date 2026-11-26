@@ -3,7 +3,9 @@ import os
 
 from gi.repository import GLib, Gtk
 
+from aspect_logic import aspect_target
 from fmt import display_name as _display_name, format_speed, format_time as _format_time
+from layout_config import sanitize_layout
 from media_uri import is_allowed_media_uri, is_http_media_uri, normalize_media_uri
 from playlist_nav import auto_advance_index
 
@@ -279,6 +281,10 @@ class PlaybackMixin:
 
             if duration > 0 and self._window_fitted_for != self._current_path:
                 self._fit_window_to_video()
+            try:
+                self._enforce_aspect_lock()
+            except Exception:
+                pass  # kunci rasio tidak boleh mengganggu auto-advance
 
             # Auto-advance ke trek berikutnya di playlist saat lagu/video selesai
             if self._has_played_media and self._current_path:
@@ -368,6 +374,51 @@ class PlaybackMixin:
         target_w = max(480, int(w * scale) + extra_w)
         target_h = max(270, int(h * scale) + chrome_h)
         self.set_default_size(target_w, target_h)
+
+    def _enforce_aspect_lock(self):
+        """Pulihkan rasio video setelah pengguna selesai mengubah ukuran jendela.
+
+        Dipanggil dari polling: ukuran dianggap "selesai diubah" bila sama pada dua
+        polling berurutan. Tidak aktif saat maximize/fullscreen/mini/music mode.
+        """
+        layout = sanitize_layout(self._config.get("layout"))
+        if not layout["lock_aspect"]:
+            self._aspect_seen = self._aspect_prev = None
+            return
+        if (
+            not self._current_path
+            or self._is_mini
+            or self._is_music_mode
+            or self.is_fullscreen()
+            or self.is_maximized()
+        ):
+            self._aspect_seen = self._aspect_prev = None
+            return
+        try:
+            vid_w = int(self.player.width or 0)
+            vid_h = int(self.player.height or 0)
+        except Exception:
+            return
+        size = (self.get_width(), self.get_height())
+        seen = getattr(self, "_aspect_seen", None)
+        self._aspect_seen = size
+        if seen != size:
+            if seen is not None:
+                self._aspect_prev = seen
+            return  # masih berubah; tunggu polling berikutnya
+        dock_layout = getattr(self, "dock_layout", None)
+        extra_w = 0
+        if dock_layout is not None:
+            extra_w = dock_layout.visible_width("playlist") + dock_layout.visible_width("inspector")
+        chrome_h = self.header_ctrl.chrome_height() + self.osc.extra_height()
+        target = aspect_target(
+            size[0], size[1], vid_w, vid_h,
+            chrome_h=chrome_h, extra_w=extra_w,
+            prev_size=getattr(self, "_aspect_prev", None),
+        )
+        self._aspect_prev = None
+        if target is not None:
+            self.set_default_size(*target)
 
     def _reset_ab_loop(self):
         try:
