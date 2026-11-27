@@ -49,19 +49,6 @@
             ]
         },
         {
-            "name": "libv4l2",
-            "cleanup": [ "/sbin", "/bin", "/include", "/lib/*.la", "/lib/*/*.la", "/lib*/*/*/*.la", "/lib/pkgconfig", "/share/man" ],
-            "config-opts": [ "--disable-static", "--disable-bpf", "--with-udevdir=/app/lib/udev" ],
-            "sources": [
-                {
-                    "type": "git",
-                    "url": "https://github.com/gjasny/v4l-utils.git",
-                    "tag": "v4l-utils-1.20.0",
-                    "commit": "3b22ab02b960e4d1e90618e9fce9b7c8a80d814a"
-                }
-            ]
-        },
-        {
             "name": "nv-codec-headers",
             "cleanup": [ "*" ],
             "no-autogen": true,
@@ -88,7 +75,6 @@
                 "--enable-encoder=png",
                 "--enable-encoder=mjpeg",
                 "--enable-muxer=image2",
-                "--enable-libv4l2",
                 "--enable-libdav1d"
             ],
             "sources": [
