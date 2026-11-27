@@ -54,9 +54,10 @@
             "config-opts": [ "--disable-static", "--disable-bpf", "--with-udevdir=/app/lib/udev" ],
             "sources": [
                 {
-                    "type": "archive",
-                    "url": "https://linuxtv.org/downloads/v4l-utils/v4l-utils-1.20.0.tar.bz2",
-                    "sha256": "956118713f7ccb405c55c7088a6a2490c32d54300dd9a30d8d5008c28d3726f7"
+                    "type": "git",
+                    "url": "https://github.com/gjasny/v4l-utils.git",
+                    "tag": "v4l-utils-1.20.0",
+                    "commit": "3b22ab02b960e4d1e90618e9fce9b7c8a80d814a"
                 }
             ]
         },
