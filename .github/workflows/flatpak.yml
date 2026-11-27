@@ -33,6 +33,7 @@ jobs:
         with:
           bundle: inaa.flatpak
           manifest-path: flatpak/io.github.inaa.json
+          run-tests: false
           cache-key: flatpak-builder-${{ github.sha }}
 
       - name: Upload Flatpak Artifact

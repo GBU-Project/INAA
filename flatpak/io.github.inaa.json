@@ -310,9 +310,9 @@
             ],
             "sources": [
                 {
-                    "type": "git",
-                    "url": "https://github.com/GBU-Project/INAA.git",
-                    "tag": "v0.2.0"
+                    "type": "dir",
+                    "path": "..",
+                    "skip": [".git", ".flatpak-build", ".flatpak-builder"]
                 }
             ]
         }
